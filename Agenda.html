@@ -208,6 +208,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
+    <span class="hint" style="font-size:11px">versie 5</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -679,8 +680,9 @@ var SHORT_DAYS=["zo","ma","di","wo","do","vr","za"];
 var UNIT="(?:uur|u|h|:)(?![a-zA-Z])";
 var RE_RANGE=new RegExp("(\\d{1,2})(?:\\s*"+UNIT+"\\s*(\\d{2})?)?\\s*(?:-|–|tot)\\s*(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
 var RE_TIME=new RegExp("(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
-var DAYWORD="(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|werkdagen|werkdag|weekenddagen|weekend|dagen|dag)";
-var RE_EVERY=new RegExp("\\b(?:elke|iedere|ieder|alle)\\s+("+DAYWORD+"(?:\\s*(?:,|en|&)\\s*"+DAYWORD+")*)\\b","i");
+var DAYWORD="(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|werkdagen|werkdag|weekenddagen|weekend|dagen|dag|ma|di|wo|do|vr|za|zo)";
+var DAYSEP="\\s*(?:,\\s*en|,|en|&|/|\\+|of)\\s*";
+var RE_EVERY=new RegExp("\\b(?:elke|iedere|ieder|alle)\\s+("+DAYWORD+"(?:"+DAYSEP+DAYWORD+")*)\\b","i");
 var MON=Object.keys(MONTHS).join("|");
 function hm(h,m){h=+h;m=m?+m:0;return (h>23||m>59)?null:pad(h)+":"+pad(m)}
 /* A real calendar date, or null. Without a year, a date in the past means next year. */
@@ -708,6 +710,7 @@ function daysFrom(str){
   var out=[];
   str.toLowerCase().split(/[^a-z]+/).forEach(function(w){
     if(Object.prototype.hasOwnProperty.call(WEEKDAYS,w))out.push(WEEKDAYS[w]);
+    else if(SHORT_DAYS.indexOf(w)>=0)out.push(SHORT_DAYS.indexOf(w));
     else if(w==="werkdag"||w==="werkdagen")out.push(1,2,3,4,5);
     else if(w==="weekend"||w==="weekenddagen")out.push(6,0);
     else if(w==="dag"||w==="dagen")out.push(0,1,2,3,4,5,6);
@@ -715,7 +718,7 @@ function daysFrom(str){
   return out.filter(function(x,i){return out.indexOf(x)===i});
 }
 function parseQuick(input){
-  var s=" "+input+" ",r={kind:"event",title:"",date:null,start:null,end:null,allDay:true,repeat:null},m,a,b;
+  var s=" "+input.replace(/[\u00a0\u2000-\u200b]/g," ")+" ",r={kind:"event",title:"",date:null,start:null,end:null,allDay:true,repeat:null},m,a,b;
   function take(re){var x=s.match(re);if(x)s=s.replace(x[0]," ");return x}
   m=s.match(/^\s*(?:voeg\s+)?(?:to-?do|taak)\b[:\s]*/i);
   if(m){r.kind="todo";s=" "+s.slice(m[0].length)}
