@@ -213,7 +213,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" style="font-size:11px">versie 9</span>
+    <span class="hint" style="font-size:11px">versie 10</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -703,6 +703,7 @@ $("#todos").addEventListener("submit",function(e){
    "dagelijks", optionally "tot 20 december"), colours ("in het rood", "kleur groen"). Prefix "todo" or "taak" adds a to-do instead.
    "aanpassen 'werk' van 9u-17u" / "wijzig ..." changes an existing appointment found by its title:
    only the things you mention are changed (time, repeat days, end date, start date, colour, "naar 'nieuwe titel'").
+   Weekdays plus another change ("aanpassen 'werk' elke ma, di, do van 9u-17u") only change those weekdays; the rest of the series stays as it was.
    "verwijder 'werk'" deletes every appointment with exactly that title (undoable). */
 var MONTHS={januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,september:9,sept:9,oktober:10,november:11,december:12,
   jan:1,feb:2,mrt:3,apr:4,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12};
@@ -840,38 +841,72 @@ function describeEvent(e){
   if(shown==="black"&&e.color!=="black")text+=" (afspraken met 'werk' zijn altijd zwart)";
   return text;
 }
-/* Change existing appointments whose title matches; returns {error} or {n,first} */
+/* Change existing appointments whose title matches; returns {error} or {n,first,merged,scope}.
+   With weekdays ("elke ma, di, do") plus another change, only the occurrences on those weekdays change:
+   a series is split so the other weekdays keep their old settings. Weekdays alone set the days of the series. */
 function modifyEvents(r){
   var t=r.title.toLowerCase();
   var hits=data.events.filter(function(e){return e.title.toLowerCase()===t});
   if(!hits.length)hits=data.events.filter(function(e){return e.title.toLowerCase().indexOf(t)>=0});
   if(!hits.length)return {error:"Ik vond geen afspraak met '"+r.title+"'."};
-  if(!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.repeat||r.untilGiven||r.date||r.color))
+  var others=!!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.untilGiven||r.date||r.color);
+  if(!others&&!r.repeat)
     return {error:"Zeg wat je wilt aanpassen, bv. aanpassen '"+r.title+"' van 9u-17u"};
-  var changed=[];
-  for(var i=0;i<hits.length;i++){
-    var e=JSON.parse(JSON.stringify(hits[i]));
+  var scope=(r.repeat&&others)?r.repeat.days:null;
+  if(scope&&r.clearRepeat)return {error:"Combineer 'niet meer herhalen' niet met weekdagen."};
+  function copy(e){return JSON.parse(JSON.stringify(e))}
+  /* apply the requested changes to a copy; returns an error text or null */
+  function apply(e,setDays){
     if(r.newTitle)e.title=r.newTitle;
     if(r.hasTime){e.start=r.start;e.end=r.end;e.allDay=false}
     if(r.setAllDay){e.allDay=true;e.start="00:00";e.end="23:59"}
     if(r.date)e.date=r.date;
     if(r.color)e.color=r.color;
     if(r.clearRepeat)delete e.repeat;
-    else if(r.repeat)e.repeat={days:r.repeat.days,until:r.untilGiven?r.until:(e.repeat?e.repeat.until:null)};
-    else if(r.untilGiven&&e.repeat)e.repeat.until=r.until;
-    else if(r.untilGiven)return {error:"'"+hits[i].title+"' wordt niet herhaald, dus een einddatum past hier niet."};
-    if(e.repeat&&e.repeat.until&&e.repeat.until<e.date)return {error:"De einddatum ligt voor de startdatum."};
-    changed.push(e);
+    else if(r.repeat&&setDays)e.repeat={days:r.repeat.days,until:r.untilGiven?r.until:(e.repeat?e.repeat.until:null)};
+    else if(r.untilGiven){
+      if(!e.repeat)return "'"+e.title+"' wordt niet herhaald, dus een einddatum past hier niet.";
+      e.repeat.until=r.until;
+    }
+    if(e.repeat&&e.repeat.until&&e.repeat.until<e.date)return "De einddatum ligt voor de startdatum.";
+    return null;
   }
-  var seen={},dupes=[];
-  hits.forEach(function(old,i){
-    Object.keys(old).forEach(function(k){delete old[k]});
-    Object.assign(old,changed[i]);
-    var key=JSON.stringify([old.title,firstOn(old),old.start,old.end,old.allDay,old.color,old.repeat||null]);
-    if(seen[key])dupes.push(old);else seen[key]=1;
+  var map={},first=null,touched=0,err;
+  for(var i=0;i<hits.length;i++){
+    var h=hits[i],out=[h],e;
+    if(!scope){
+      e=copy(h);err=apply(e,true);if(err)return {error:err};
+      out=[e];touched++;first=first||e;
+    }else if(h.repeat){
+      var inScope=h.repeat.days.filter(function(d){return scope.indexOf(d)>=0});
+      var rest=h.repeat.days.filter(function(d){return scope.indexOf(d)<0});
+      if(inScope.length){
+        e=copy(h);
+        if(rest.length){e.id=uid();e.repeat.days=inScope}
+        err=apply(e,false);if(err)return {error:err};
+        out=rest.length?[(function(){var o=copy(h);o.repeat.days=rest;return o})(),e]:[e];
+        touched++;first=first||e;
+      }
+    }else if(scope.indexOf(parse(h.date).getDay())>=0){
+      e=copy(h);err=apply(e,false);if(err)return {error:err};
+      out=[e];touched++;first=first||e;
+    }
+    map[h.id]=out;
+  }
+  if(!touched)return {error:"Ik vond geen '"+r.title+"' op "+repeatLabel({days:scope}).replace("elke ","")+"."};
+  var flat=[];
+  data.events.forEach(function(e){if(map[e.id])Array.prototype.push.apply(flat,map[e.id]);else flat.push(e)});
+  /* merge identical results (same title, first day, time, colour and repeat) */
+  var seen={},merged=0;
+  var derived=[];Object.keys(map).forEach(function(k){Array.prototype.push.apply(derived,map[k])});
+  flat=flat.filter(function(e){
+    if(derived.indexOf(e)<0)return true;
+    var key=JSON.stringify([e.title,firstOn(e),e.start,e.end,e.allDay,e.color,e.repeat||null]);
+    if(seen[key]){merged++;return false}
+    seen[key]=1;return true;
   });
-  if(dupes.length)data.events=data.events.filter(function(e){return dupes.indexOf(e)<0});
-  return {n:hits.length,first:hits[0],merged:dupes.length};
+  data.events=flat;
+  return {n:touched,first:first,merged:merged,scope:scope};
 }
 /* Delete every appointment (series included) with exactly this title; returns {error} or {n} */
 function deleteEvents(r){
@@ -898,7 +933,7 @@ $("#quickForm").addEventListener("submit",function(e){
     msg.classList.toggle("err",!!res.error);
     if(res.error){msg.textContent=res.error;return}
     ui.cursor=firstOn(res.first);
-    msg.textContent="Aangepast"+(res.n>1?" ("+res.n+" afspraken)":"")+": "+res.first.title+" \u2014 "+describeEvent(res.first)
+    msg.textContent="Aangepast"+(res.n>1?" ("+res.n+" afspraken)":"")+(res.scope?" (alleen op "+repeatLabel({days:res.scope}).replace("elke ","")+")":"")+": "+res.first.title+" \u2014 "+describeEvent(res.first)
       +(res.merged?". "+res.merged+" dubbele "+(res.merged>1?"afspraken":"afspraak")+" samengevoegd.":"");
   }else if(r.kind==="delete"){
     var del=deleteEvents(r);
