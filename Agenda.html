@@ -143,6 +143,13 @@ button{cursor:pointer}
 .status{font-size:12px;color:var(--muted)}
 [hidden]{display:none!important}
 
+/* Quick add bar */
+.quick{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.quick input{flex:1 1 280px;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px}
+.quick .status{flex:1 1 100%}
+.quick .status:empty{display:none}
+.quick .status.err{color:var(--c-red)}
+
 /* The calendar adapts to its own width */
 @container (max-width:720px){
   .month .dow{padding:6px 2px;font-size:10px;text-align:center}
@@ -190,6 +197,12 @@ button{cursor:pointer}
     <span class="status" id="syncStatus" role="status" hidden></span>
     <button class="btn" id="syncBtn" hidden>Inloggen</button>
   </header>
+
+  <form class="quick" id="quickForm" autocomplete="off">
+    <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
+    <button class="btn primary" type="submit">Toevoegen</button>
+    <span class="status" id="quickMsg" role="status"></span>
+  </form>
 
   <div class="main">
     <section class="cal"><div class="scroller" id="scroller"></div></section>
@@ -615,6 +628,82 @@ $("#todos").addEventListener("submit",function(e){
   data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null});
   inp.value="";save();renderHead();renderTodos();
   var again=document.getElementById(f.dataset.add==="day"?"add-day":"add-gen");if(again)again.focus();
+});
+
+/* Quick add: type a sentence such as  voeg 'voetbaltraining' toe op 23 november van 19u30-21u
+   Understands: quoted title, dates (23 november, 23/11, 2026-11-23, vandaag, morgen, overmorgen, weekdays),
+   times (19u30, 19:30, 19u-22u, van 19u30 tot 21u). Prefix "todo" or "taak" adds a to-do instead. */
+var MONTHS={januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,september:9,sept:9,oktober:10,november:11,december:12,
+  jan:1,feb:2,mrt:3,apr:4,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12};
+var WEEKDAYS={zondag:0,maandag:1,dinsdag:2,woensdag:3,donderdag:4,vrijdag:5,zaterdag:6};
+var UNIT="(?:uur|u|h|:)(?![a-zA-Z])";
+var RE_RANGE=new RegExp("(\\d{1,2})(?:\\s*"+UNIT+"\\s*(\\d{2})?)?\\s*(?:-|–|tot)\\s*(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
+var RE_TIME=new RegExp("(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
+function hm(h,m){h=+h;m=m?+m:0;return (h>23||m>59)?null:pad(h)+":"+pad(m)}
+function parseQuick(input){
+  var s=" "+input+" ",r={kind:"event",title:"",date:null,start:null,end:null,allDay:true},m,a,b;
+  function take(re){var x=s.match(re);if(x)s=s.replace(x[0]," ");return x}
+  m=s.match(/^\s*(?:voeg\s+)?(?:to-?do|taak)\b[:\s]*/i);
+  if(m){r.kind="todo";s=" "+s.slice(m[0].length)}
+  m=take(/["“„«'‘](.+?)["”»'’]/);
+  if(m)r.title=m[1].trim();
+  /* time */
+  if((m=take(RE_RANGE))){
+    a=hm(m[1],m[2]);b=hm(m[3],m[4]);
+    if(!a||!b)return {error:"Ongeldige tijd."};
+    if(b<=a)return {error:"Het einde moet na het begin liggen."};
+    r.start=a;r.end=b;r.allDay=false;
+  }else if((m=take(RE_TIME))){
+    a=hm(m[1],m[2]);if(!a)return {error:"Ongeldige tijd."};
+    r.start=a;r.end=fromMin(toMin(a)+60);r.allDay=false;
+  }
+  /* date */
+  var d=null,found=false,y=+todayStr.slice(0,4);
+  function mk(Y,Mo,D,noYear){
+    var x=new Date(Y,Mo-1,D);if(x.getMonth()!==Mo-1||x.getDate()!==D)return null;
+    var out=ymd(x);
+    if(noYear&&out<todayStr){x=new Date(Y+1,Mo-1,D);if(x.getMonth()!==Mo-1||x.getDate()!==D)return null;out=ymd(x)}
+    return out;
+  }
+  if((m=take(/(\d{4})-(\d{1,2})-(\d{1,2})/))){found=true;d=mk(+m[1],+m[2],+m[3],false)}
+  else if((m=take(new RegExp("(\\d{1,2})(?:ste|de|e)?\\s*("+Object.keys(MONTHS).join("|")+")\\b(?:\\s+(\\d{4}))?","i")))){
+    found=true;d=mk(m[3]?+m[3]:y,MONTHS[m[2].toLowerCase()],+m[1],!m[3]);
+  }
+  else if((m=take(/(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{2,4}))?/))){
+    found=true;var yy=m[3]?(+m[3]<100?2000+ +m[3]:+m[3]):y;d=mk(yy,+m[2],+m[1],!m[3]);
+  }
+  else if((m=take(/\b(overmorgen|morgen|vandaag)\b/i))){
+    found=true;d=addDays(todayStr,{vandaag:0,morgen:1,overmorgen:2}[m[1].toLowerCase()]);
+  }
+  else if((m=take(/\b(?:volgende\s+|aanstaande\s+)?(zondag|maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag)\b/i))){
+    found=true;var diff=(WEEKDAYS[m[1].toLowerCase()]-parse(todayStr).getDay()+7)%7||7;d=addDays(todayStr,diff);
+  }
+  if(found&&!d)return {error:"Ongeldige datum."};
+  r.date=d||(r.kind==="todo"?null:todayStr);
+  /* title */
+  if(!r.title){
+    r.title=s.replace(/\b(voeg|toe|zet|plan|op|om|van|tot|vanaf|rond|aan|mijn|agenda|volgende|aanstaande)\b/gi," ")
+      .replace(/[,;:]+/g," ").replace(/\s+/g," ").trim();
+  }
+  if(!r.title)return {error:"Ik vond geen titel. Zet de titel tussen aanhalingstekens, bv. 'tandarts'."};
+  return r;
+}
+$("#quickForm").addEventListener("submit",function(e){
+  e.preventDefault();
+  var inp=$("#quickInput"),msg=$("#quickMsg"),v=inp.value.trim();if(!v)return;
+  var r=parseQuick(v);
+  msg.classList.toggle("err",!!r.error);
+  if(r.error){msg.textContent=r.error;return}
+  if(r.kind==="todo"){
+    data.todos.push({id:uid(),text:r.title,done:false,date:r.date});
+    if(r.date)ui.cursor=r.date;
+    msg.textContent="To-do toegevoegd: "+r.title+(r.date?" ("+fLong(r.date)+")":" (algemeen)");
+  }else{
+    data.events.push({id:uid(),title:r.title,date:r.date,start:r.allDay?"00:00":r.start,end:r.allDay?"23:59":r.end,allDay:r.allDay,color:"blue"});
+    ui.cursor=r.date;
+    msg.textContent="Toegevoegd: "+r.title+" — "+fLong(r.date)+", "+(r.allDay?"hele dag":r.start+"–"+r.end);
+  }
+  inp.value="";save();renderAll();
 });
 
 /* Header buttons */
