@@ -213,7 +213,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" style="font-size:11px">versie 7</span>
+    <span class="hint" style="font-size:11px">versie 8</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -700,7 +700,9 @@ $("#todos").addEventListener("submit",function(e){
 /* Quick add: type a sentence such as  voeg 'voetbaltraining' toe op 23 november van 19u30-21u
    Understands: quoted title, dates (23 november, 23/11, 2026-11-23, vandaag, morgen, overmorgen, weekdays),
    times (19u30, 19:30, 19u-22u, van 19u30 tot 21u), repeats ("elke maandag, dinsdag en vrijdag", "elke werkdag",
-   "dagelijks", optionally "tot 20 december"). Prefix "todo" or "taak" adds a to-do instead. */
+   "dagelijks", optionally "tot 20 december"), colours ("in het rood", "kleur groen"). Prefix "todo" or "taak" adds a to-do instead.
+   "aanpassen 'werk' van 9u-17u" / "wijzig ..." changes an existing appointment found by its title:
+   only the things you mention are changed (time, repeat days, end date, start date, colour, "naar 'nieuwe titel'"). */
 var MONTHS={januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,september:9,sept:9,oktober:10,november:11,december:12,
   jan:1,feb:2,mrt:3,apr:4,jun:6,jul:7,aug:8,sep:9,okt:10,nov:11,dec:12};
 var WEEKDAYS={zondag:0,maandag:1,dinsdag:2,woensdag:3,donderdag:4,vrijdag:5,zaterdag:6};
@@ -712,6 +714,8 @@ var DAYWORD="(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|werkd
 var DAYSEP="\\s*(?:,\\s*en|,|en|&|/|\\+|of)\\s*";
 var RE_EVERY=new RegExp("\\b(?:elke|iedere|ieder|alle)\\s+("+DAYWORD+"(?:"+DAYSEP+DAYWORD+")*)\\b","i");
 var MON=Object.keys(MONTHS).join("|");
+var COLOR_WORDS={blauw:"blue",blauwe:"blue",groen:"green",groene:"green",oranje:"orange",rood:"red",rode:"red",paars:"purple",paarse:"purple",zwart:"black",zwarte:"black"};
+var RE_COLOR=/\b(?:(?:met\s+)?(?:de\s+)?kleur[:\s]+|in\s+(?:het\s+|de\s+)?)?(blauwe?|groene?|oranje|rood|rode|paarse?|zwarte?)\b/i;
 function hm(h,m){h=+h;m=m?+m:0;return (h>23||m>59)?null:pad(h)+":"+pad(m)}
 /* A real calendar date, or null. Without a year, a date in the past means next year. */
 function mkDate(Y,Mo,D,noYear){
@@ -748,29 +752,43 @@ function daysFrom(str){
 function parseQuick(input){
   var s=" "+input.replace(/[\u00a0\u2000-\u200b]/g," ")+" ",r={kind:"event",title:"",date:null,start:null,end:null,allDay:true,repeat:null},m,a,b;
   function take(re){var x=s.match(re);if(x)s=s.replace(x[0]," ");return x}
-  m=s.match(/^\s*(?:voeg\s+)?(?:to-?do|taak)\b[:\s]*/i);
+  m=s.match(/^\s*(?:aanpassen|aanpas|wijzigen|wijzig|pas)\b/i);
+  if(m){r.kind="modify";s=" "+s.slice(m[0].length)}
+  m=r.kind==="event"&&s.match(/^\s*(?:voeg\s+)?(?:to-?do|taak)\b[:\s]*/i);
   if(m){r.kind="todo";s=" "+s.slice(m[0].length)}
+  if(r.kind==="modify"){
+    m=take(/\bnaar\s+["“„«'‘](.+?)["”»'’]/);
+    if(m)r.newTitle=m[1].trim();
+    if(take(/\b(?:de\s+)?hele\s*dag\b/i))r.setAllDay=true;
+    if(take(/\b(?:niet\s+meer\s+herhalen|geen\s+herhaling|eenmalig)\b/i))r.clearRepeat=true;
+  }
   m=take(/["“„«'‘](.+?)["”»'’]/);
   if(m)r.title=m[1].trim();
+  /* colour: "in het rood", "kleur groen", or a bare colour word next to a quoted title */
+  if(r.kind!=="todo"){
+    m=s.match(RE_COLOR);
+    if(m&&(r.title||m[0].trim().length>m[1].length)){r.color=COLOR_WORDS[m[1].toLowerCase()];s=s.replace(m[0]," ")}
+  }
   /* time */
   if((m=take(RE_RANGE))){
     a=hm(m[1],m[2]);b=hm(m[3],m[4]);
     if(!a||!b)return {error:"Ongeldige tijd."};
     if(b<=a)return {error:"Het einde moet na het begin liggen."};
-    r.start=a;r.end=b;r.allDay=false;
+    r.start=a;r.end=b;r.allDay=false;r.hasTime=true;
   }else if((m=take(RE_TIME))){
     a=hm(m[1],m[2]);if(!a)return {error:"Ongeldige tijd."};
-    r.start=a;r.end=fromMin(toMin(a)+60);r.allDay=false;
+    r.start=a;r.end=fromMin(toMin(a)+60);r.allDay=false;r.hasTime=true;
   }
   /* repeat: "elke maandag, dinsdag en vrijdag", "elke werkdag", "elke dag", "dagelijks" */
   var days=null,until=null;
   if((m=take(RE_EVERY)))days=daysFrom(m[1]);
   else if(take(/\bdagelijks\b/i))days=[0,1,2,3,4,5,6];
-  if(days){
+  if(days||r.kind==="modify"){
     var u=pullDate(s,"(?:tot en met|tot)\\s+");s=u.s;
     if(u.date===null)return {error:"Ongeldige einddatum."};
     if(u.date)until=u.date;
   }
+  r.untilGiven=!!until;r.until=until;
   /* start date */
   var d=null,found=false,pd=pullDate(s);
   s=pd.s;
@@ -783,18 +801,65 @@ function parseQuick(input){
   }
   if(found&&!d)return {error:"Ongeldige datum."};
   if(days&&r.kind==="todo")return {error:"To-do's kunnen niet herhaald worden."};
-  r.date=d||(r.kind==="todo"?null:todayStr);
+  r.date=d||(r.kind==="event"?todayStr:null);
   if(days){
-    if(until&&until<r.date)return {error:"De einddatum ligt voor de startdatum."};
+    if(until&&r.date&&until<r.date)return {error:"De einddatum ligt voor de startdatum."};
     r.repeat={days:days,until:until};
   }
   /* title */
   if(!r.title){
-    r.title=s.replace(/\b(voeg|toe|zet|plan|op|om|van|tot|vanaf|rond|aan|mijn|agenda|volgende|aanstaande)\b/gi," ")
+    r.title=s.replace(/\b(voeg|toe|zet|plan|op|om|van|tot|vanaf|rond|aan|naar|mijn|agenda|volgende|aanstaande)\b/gi," ")
+      .replace(/(^|\s)["'‘’“”„«»]+|["'‘’“”„«»]+(?=\s|$)/g," ")
       .replace(/[,;:]+/g," ").replace(/\s+/g," ").trim();
   }
   if(!r.title)return {error:"Ik vond geen titel. Zet de titel tussen aanhalingstekens, bv. 'tandarts'."};
   return r;
+}
+/* First day an appointment actually occurs */
+function firstOn(e){
+  if(!e.repeat)return e.date;
+  for(var i=0;i<7;i++){var c=addDays(e.date,i);if(e.repeat.days.indexOf(parse(c).getDay())>=0)return c}
+  return e.date;
+}
+var COLOR_NL={blue:"blauw",green:"groen",orange:"oranje",red:"rood",purple:"paars",black:"zwart"};
+function describeEvent(e){
+  var when=e.allDay?"hele dag":e.start+"\u2013"+e.end;
+  var text=e.repeat
+    ? repeatLabel(e.repeat)+", "+when+", vanaf "+fLong(firstOn(e))+(e.repeat.until?" tot "+fLong(e.repeat.until):"")
+    : fLong(e.date)+", "+when;
+  var shown=colorOf(e);
+  text+=", "+COLOR_NL[shown];
+  if(shown==="black"&&e.color!=="black")text+=" (afspraken met 'werk' zijn altijd zwart)";
+  return text;
+}
+/* Change existing appointments whose title matches; returns {error} or {n,first} */
+function modifyEvents(r){
+  var t=r.title.toLowerCase();
+  var hits=data.events.filter(function(e){return e.title.toLowerCase()===t});
+  if(!hits.length)hits=data.events.filter(function(e){return e.title.toLowerCase().indexOf(t)>=0});
+  if(!hits.length)return {error:"Ik vond geen afspraak met '"+r.title+"'."};
+  if(!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.repeat||r.untilGiven||r.date||r.color))
+    return {error:"Zeg wat je wilt aanpassen, bv. aanpassen '"+r.title+"' van 9u-17u"};
+  var changed=[];
+  for(var i=0;i<hits.length;i++){
+    var e=JSON.parse(JSON.stringify(hits[i]));
+    if(r.newTitle)e.title=r.newTitle;
+    if(r.hasTime){e.start=r.start;e.end=r.end;e.allDay=false}
+    if(r.setAllDay){e.allDay=true;e.start="00:00";e.end="23:59"}
+    if(r.date)e.date=r.date;
+    if(r.color)e.color=r.color;
+    if(r.clearRepeat)delete e.repeat;
+    else if(r.repeat)e.repeat={days:r.repeat.days,until:r.untilGiven?r.until:(e.repeat?e.repeat.until:null)};
+    else if(r.untilGiven&&e.repeat)e.repeat.until=r.until;
+    else if(r.untilGiven)return {error:"'"+hits[i].title+"' wordt niet herhaald, dus een einddatum past hier niet."};
+    if(e.repeat&&e.repeat.until&&e.repeat.until<e.date)return {error:"De einddatum ligt voor de startdatum."};
+    changed.push(e);
+  }
+  hits.forEach(function(old,i){
+    Object.keys(old).forEach(function(k){delete old[k]});
+    Object.assign(old,changed[i]);
+  });
+  return {n:hits.length,first:hits[0]};
 }
 function repeatLabel(rp){
   if(rp.days.length===7)return "elke dag";
@@ -807,12 +872,18 @@ $("#quickForm").addEventListener("submit",function(e){
   msg.classList.toggle("err",!!r.error);
   if(r.error){msg.textContent=r.error;return}
   var when=r.allDay?"hele dag":r.start+"–"+r.end;
-  if(r.kind==="todo"){
+  if(r.kind==="modify"){
+    var res=modifyEvents(r);
+    msg.classList.toggle("err",!!res.error);
+    if(res.error){msg.textContent=res.error;return}
+    ui.cursor=firstOn(res.first);
+    msg.textContent="Aangepast"+(res.n>1?" ("+res.n+" afspraken)":"")+": "+res.first.title+" \u2014 "+describeEvent(res.first);
+  }else if(r.kind==="todo"){
     data.todos.push({id:uid(),text:r.title,done:false,date:r.date});
     if(r.date)ui.cursor=r.date;
     msg.textContent="To-do toegevoegd: "+r.title+(r.date?" ("+fLong(r.date)+")":" (algemeen)");
   }else{
-    var ev={id:uid(),title:r.title,date:r.date,start:r.allDay?"00:00":r.start,end:r.allDay?"23:59":r.end,allDay:r.allDay,color:"blue"};
+    var ev={id:uid(),title:r.title,date:r.date,start:r.allDay?"00:00":r.start,end:r.allDay?"23:59":r.end,allDay:r.allDay,color:r.color||"blue"};
     var first=r.date;
     if(r.repeat){
       ev.repeat=r.repeat;
@@ -823,6 +894,7 @@ $("#quickForm").addEventListener("submit",function(e){
     msg.textContent="Toegevoegd: "+r.title+" — "+(r.repeat
       ? repeatLabel(r.repeat)+", "+when+", vanaf "+fLong(first)+(r.repeat.until?" tot "+fLong(r.repeat.until):"")
       : fLong(r.date)+", "+when);
+    if(r.color)msg.textContent+=", "+COLOR_NL[colorOf(ev)]+(colorOf(ev)==="black"&&r.color!=="black"?" (afspraken met 'werk' zijn altijd zwart)":"");
   }
   inp.value="";save();renderAll();
 });
