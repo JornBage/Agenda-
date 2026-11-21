@@ -12,7 +12,7 @@
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --ink:#18202c; --muted:#667085; --line:#e2e6ec;
   --accent:#17727c; --accent-ink:#ffffff; --today:#e6f3f4; --sel:#d3eaec;
-  --c-blue:#3b6fd4; --c-green:#2e9a68; --c-orange:#d4811f; --c-red:#cc4848; --c-purple:#8657cf;
+  --c-blue:#3b6fd4; --c-green:#2e9a68; --c-orange:#d4811f; --c-red:#cc4848; --c-purple:#8657cf; --c-black:#1c2530;
   --shadow:0 8px 28px rgba(20,30,50,.16);
   --f-display:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
   --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
     --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
-    --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec;
+    --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec; --c-black:#aab4c1;
     --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
   --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
-  --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec;
+  --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec; --c-black:#aab4c1;
   --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -80,7 +80,10 @@ button{cursor:pointer}
 .ev{--c:var(--c-blue);border:0;text-align:left;width:100%;background:color-mix(in srgb,var(--c) 17%,var(--surface));border-left:3px solid var(--c);border-radius:5px;padding:2px 6px;font-size:12px;line-height:1.3;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
 .ev:hover{background:color-mix(in srgb,var(--c) 28%,var(--surface))}
 .ev b{font-weight:600;margin-right:4px;color:color-mix(in srgb,var(--c) 70%,var(--ink))}
-.c-blue{--c:var(--c-blue)}.c-green{--c:var(--c-green)}.c-orange{--c:var(--c-orange)}.c-red{--c:var(--c-red)}.c-purple{--c:var(--c-purple)}
+.c-blue{--c:var(--c-blue)}.c-green{--c:var(--c-green)}.c-orange{--c:var(--c-orange)}.c-red{--c:var(--c-red)}.c-purple{--c:var(--c-purple)}.c-black{--c:var(--c-black)}
+.ev.c-black,.ev.c-black:hover{background:var(--c-black);color:var(--surface)}
+.ev.c-black:hover{filter:brightness(1.2)}
+.ev.c-black b{color:var(--surface)}
 
 /* Week and day */
 .sticky{position:sticky;top:0;z-index:4;background:var(--surface)}
@@ -210,7 +213,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" style="font-size:11px">versie 6</span>
+    <span class="hint" style="font-size:11px">versie 7</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -252,13 +255,14 @@ button{cursor:pointer}
       </div>
     </div>
     <label class="fld" id="untilRow">Herhalen tot <span class="hint">(optioneel, anders blijft het doorlopen)</span><input type="date" id="f-until"></label>
-    <div class="fld">Kleur
+    <div class="fld">Kleur <span class="hint">(afspraken met "werk" in de titel zijn altijd zwart)</span>
       <div class="swatches" role="radiogroup" aria-label="Kleur" id="swatches">
         <button type="button" class="sw c-blue" role="radio" data-c="blue" aria-label="Blauw"></button>
         <button type="button" class="sw c-green" role="radio" data-c="green" aria-label="Groen"></button>
         <button type="button" class="sw c-orange" role="radio" data-c="orange" aria-label="Oranje"></button>
         <button type="button" class="sw c-red" role="radio" data-c="red" aria-label="Rood"></button>
         <button type="button" class="sw c-purple" role="radio" data-c="purple" aria-label="Paars"></button>
+        <button type="button" class="sw c-black" role="radio" data-c="black" aria-label="Zwart"></button>
       </div>
     </div>
     <div class="acts">
@@ -473,8 +477,10 @@ function eventsOn(d){
     return (b.allDay?1:0)-(a.allDay?1:0)||toMin(a.start)-toMin(b.start)});
 }
 function timeLabel(e){return e.allDay?"":e.start}
+/* Appointments with "werk" in the title (werk, werkoverleg, ...) are always shown in black */
+function colorOf(e){return /\bwerk/i.test(e.title)?"black":e.color}
 function evChip(e){
-  return '<button class="ev c-'+esc(e.color)+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+"</button>";
+  return '<button class="ev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+"</button>";
 }
 function visibleDays(){
   if(ui.view==="day")return [ui.cursor];
@@ -547,7 +553,7 @@ function renderGrid(){
     html+='<div class="col'+(d===todayStr?" today":"")+'" data-col="'+d+'" style="height:'+(24*HOUR)+'px">';
     pack(items).forEach(function(it){
       var top=it.s/60*HOUR,hgt=Math.max((it.t-it.s)/60*HOUR-2,20),w=100/it.n;
-      html+='<button class="ev c-'+esc(it.e.color)+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+"</button>";
+      html+='<button class="ev c-'+esc(colorOf(it.e))+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+"</button>";
     });
     if(d===todayStr)html+='<div class="now" style="top:'+(nowMin/60*HOUR)+'px"></div>';
     html+="</div>";
