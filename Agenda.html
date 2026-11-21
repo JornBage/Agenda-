@@ -47,6 +47,7 @@ button{cursor:pointer}
 .nav{display:flex;gap:6px;align-items:center}
 .btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:600}
 .btn:hover{background:var(--bg)}
+.btn:disabled{opacity:.45;cursor:default}
 .btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
 .btn.primary:hover{filter:brightness(1.08)}
 .btn.icon{padding:7px 10px;line-height:1}
@@ -200,6 +201,7 @@ button{cursor:pointer}
       <button role="tab" id="tab-day" data-view="day">Dag</button>
     </div>
     <button class="btn primary" id="newEv">+ Afspraak</button>
+    <button class="btn" id="undoBtn" disabled title="Laatste wijziging ongedaan maken (Ctrl+Z)">&#8630; Ongedaan maken</button>
     <button class="btn" id="toggleSide" aria-expanded="true" aria-controls="side">To-do's<span class="badge" id="badge">0</span></button>
     <span class="status" id="syncStatus" role="status" hidden></span>
     <button class="btn" id="syncBtn" hidden>Inloggen</button>
@@ -208,7 +210,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" style="font-size:11px">versie 5</span>
+    <span class="hint" style="font-size:11px">versie 6</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -346,7 +348,26 @@ function isDirty(){try{return localStorage.getItem(DIRTYKEY)==="1"}catch(e){retu
 function setDirty(v){try{v?localStorage.setItem(DIRTYKEY,"1"):localStorage.removeItem(DIRTYKEY)}catch(e){}}
 function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
 /* Call after every real change: store locally, mark as not yet uploaded, upload shortly after */
-function save(){persistLocal();sync.ver++;setDirty(true);schedulePush()}
+/* Undo: every save() remembers the state from before the change (this session only, last 50 changes) */
+var undoStack=[], lastSnap=JSON.stringify(data);
+function updateUndoBtn(){
+  var n=undoStack.length;
+  $("#undoBtn").disabled=n===0;
+  $("#undoBtn").innerHTML="&#8630; Ongedaan maken"+(n?" ("+n+")":"");
+}
+function resetUndo(){undoStack=[];lastSnap=JSON.stringify(data);updateUndoBtn()}
+function save(){
+  var now=JSON.stringify(data);
+  if(now!==lastSnap){undoStack.push(lastSnap);if(undoStack.length>50)undoStack.shift();lastSnap=now}
+  persistLocal();sync.ver++;setDirty(true);schedulePush();updateUndoBtn();
+}
+function undo(){
+  if(!undoStack.length)return;
+  var snap=undoStack.pop();
+  data=JSON.parse(snap);lastSnap=snap;
+  persistLocal();sync.ver++;setDirty(true);schedulePush();updateUndoBtn();renderAll();
+  var msg=$("#quickMsg");msg.classList.remove("err");msg.textContent="Laatste wijziging ongedaan gemaakt."+(undoStack.length?" Klik opnieuw om nog een stap terug te gaan.":"");
+}
 function setStatus(t){$("#syncStatus").textContent=t}
 function updateSyncUi(){
   $("#syncBtn").textContent=sync.user?"Uitloggen":"Inloggen";
@@ -387,7 +408,7 @@ function pull(){
     if(!valid||(known&&isDirty()))return push();      /* nothing in the cloud yet, or local changes win */
     data=known?remote:union(remote,data);              /* first login on this device merges both */
     if(applyPresets())sync.ver++;
-    persistLocal();renderAll();
+    persistLocal();resetUndo();renderAll();
     if(!known||isDirty())return push();
     setStatus("Gesynchroniseerd");
   }).catch(function(){setStatus("Niet gesynchroniseerd (offline?)")}).then(function(){sync.busy=false});
@@ -438,6 +459,7 @@ function applyPresets(){
   return added;
 }
 if(applyPresets())save();else persistLocal();
+resetUndo();
 
 /* Helpers */
 /* An event with repeat:{days:[0-6],until:date|null} occurs on the chosen weekdays, from its start date until the end date */
@@ -804,6 +826,13 @@ $("#prev").addEventListener("click",function(){shift(-1)});
 $("#next").addEventListener("click",function(){shift(1)});
 $("#today").addEventListener("click",function(){ui.cursor=todayStr;renderAll()});
 document.querySelectorAll(".tabs button").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.view)})});
+$("#undoBtn").addEventListener("click",undo);
+document.addEventListener("keydown",function(e){
+  if(!(e.ctrlKey||e.metaKey)||e.shiftKey||e.key.toLowerCase()!=="z")return;
+  var t=e.target||{},typing=(t.tagName==="INPUT"&&t.type!=="checkbox")||t.tagName==="TEXTAREA"||t.tagName==="SELECT";
+  if(typing||$("#scrim").classList.contains("on")||$("#loginScrim").classList.contains("on"))return;
+  e.preventDefault();undo();
+});
 $("#newEv").addEventListener("click",function(){openDlg(null,{date:ui.cursor})});
 function toggleSide(){ui.side=!ui.side;saveUi();applySide()}
 $("#toggleSide").addEventListener("click",toggleSide);
