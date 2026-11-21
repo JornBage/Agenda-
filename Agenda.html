@@ -143,6 +143,13 @@ button{cursor:pointer}
 .status{font-size:12px;color:var(--muted)}
 [hidden]{display:none!important}
 
+/* Weekday picker for repeating events */
+.days{display:flex;gap:6px;flex-wrap:wrap}
+.day{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-weight:600;color:var(--ink);cursor:pointer;background:var(--bg)}
+.day input{margin:0;accent-color:var(--accent)}
+.day:has(input:checked){background:var(--sel);border-color:var(--accent)}
+.hint{font-weight:400;color:var(--muted)}
+
 /* Quick add bar */
 .quick{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
 .quick input{flex:1 1 280px;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px}
@@ -230,6 +237,18 @@ button{cursor:pointer}
       <label class="fld">Van<input type="time" id="f-start" value="09:00"></label>
       <label class="fld">Tot<input type="time" id="f-end" value="10:00"></label>
     </div>
+    <div class="fld">Herhalen op <span class="hint">(optioneel, vanaf de gekozen datum)</span>
+      <div class="days" id="days">
+        <label class="day"><input type="checkbox" value="1">ma</label>
+        <label class="day"><input type="checkbox" value="2">di</label>
+        <label class="day"><input type="checkbox" value="3">wo</label>
+        <label class="day"><input type="checkbox" value="4">do</label>
+        <label class="day"><input type="checkbox" value="5">vr</label>
+        <label class="day"><input type="checkbox" value="6">za</label>
+        <label class="day"><input type="checkbox" value="0">zo</label>
+      </div>
+    </div>
+    <label class="fld" id="untilRow">Herhalen tot <span class="hint">(optioneel, anders blijft het doorlopen)</span><input type="date" id="f-until"></label>
     <div class="fld">Kleur
       <div class="swatches" role="radiogroup" aria-label="Kleur" id="swatches">
         <button type="button" class="sw c-blue" role="radio" data-c="blue" aria-label="Blauw"></button>
@@ -420,13 +439,19 @@ function applyPresets(){
 if(applyPresets())save();else persistLocal();
 
 /* Helpers */
+/* An event with repeat:{days:[0-6],until:date|null} occurs on the chosen weekdays, from its start date until the end date */
+function occursOn(e,d){
+  if(!e.repeat)return e.date===d;
+  if(d<e.date||(e.repeat.until&&d>e.repeat.until))return false;
+  return e.repeat.days.indexOf(parse(d).getDay())>=0;
+}
 function eventsOn(d){
-  return data.events.filter(function(e){return e.date===d}).sort(function(a,b){
+  return data.events.filter(function(e){return occursOn(e,d)}).sort(function(a,b){
     return (b.allDay?1:0)-(a.allDay?1:0)||toMin(a.start)-toMin(b.start)});
 }
 function timeLabel(e){return e.allDay?"":e.start}
 function evChip(e){
-  return '<button class="ev c-'+esc(e.color)+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+esc(e.title)+"</button>";
+  return '<button class="ev c-'+esc(e.color)+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+"</button>";
 }
 function visibleDays(){
   if(ui.view==="day")return [ui.cursor];
@@ -499,7 +524,7 @@ function renderGrid(){
     html+='<div class="col'+(d===todayStr?" today":"")+'" data-col="'+d+'" style="height:'+(24*HOUR)+'px">';
     pack(items).forEach(function(it){
       var top=it.s/60*HOUR,hgt=Math.max((it.t-it.s)/60*HOUR-2,20),w=100/it.n;
-      html+='<button class="ev c-'+esc(it.e.color)+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+esc(it.e.title)+"</button>";
+      html+='<button class="ev c-'+esc(it.e.color)+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+"</button>";
     });
     if(d===todayStr)html+='<div class="now" style="top:'+(nowMin/60*HOUR)+'px"></div>';
     html+="</div>";
@@ -554,6 +579,11 @@ function setView(v,d){ui.view=v;if(d)ui.cursor=d;saveUi();try{history.replaceSta
 var editing=null,color="blue";
 function setColor(c){color=c;document.querySelectorAll(".sw").forEach(function(b){b.setAttribute("aria-checked",String(b.dataset.c===c))})}
 function syncAll(){$("#timeRow").style.display=$("#f-all").checked?"none":"grid"}
+function syncRepeat(){
+  var any=document.querySelectorAll("#days input:checked").length>0;
+  $("#untilRow").style.display=any?"":"none";
+  $("#f-until").min=$("#f-date").value||"";
+}
 function openDlg(e,def){
   editing=e||null;
   $("#dlgTitle").textContent=e?"Afspraak bewerken":"Nieuwe afspraak";
@@ -564,8 +594,12 @@ function openDlg(e,def){
   $("#f-start").value=v.start||"09:00";
   $("#f-end").value=v.end||"10:00";
   setColor(v.color||"blue");
+  var rp=v.repeat||null;
+  document.querySelectorAll("#days input").forEach(function(i){i.checked=!!rp&&rp.days.indexOf(+i.value)>=0});
+  $("#f-until").value=rp&&rp.until?rp.until:"";
   $("#f-del").style.display=e?"":"none";
-  syncAll();
+  $("#f-del").textContent=e&&e.repeat?"Reeks verwijderen":"Verwijderen";
+  syncAll();syncRepeat();
   $("#scrim").classList.add("on");
   setTimeout(function(){$("#f-title").focus()},0);
 }
@@ -576,10 +610,14 @@ $("#form").addEventListener("submit",function(ev){
   if(!all&&toMin(t)<=toMin(s))t=fromMin(toMin(s)+60);
   var o={title:$("#f-title").value.trim(),date:$("#f-date").value,allDay:all,start:all?"00:00":s,end:all?"23:59":t,color:color};
   if(!o.title||!o.date)return;
-  if(editing){Object.assign(editing,o)}else{o.id=uid();data.events.push(o)}
+  var days=[].slice.call(document.querySelectorAll("#days input:checked")).map(function(i){return +i.value});
+  if(days.length)o.repeat={days:days,until:$("#f-until").value||null};
+  if(editing){Object.assign(editing,o);if(!days.length)delete editing.repeat}else{o.id=uid();data.events.push(o)}
   save();closeDlg();ui.cursor=o.date;renderAll();
 });
 $("#f-all").addEventListener("change",syncAll);
+$("#days").addEventListener("change",syncRepeat);
+$("#f-date").addEventListener("change",syncRepeat);
 $("#f-cancel").addEventListener("click",closeDlg);
 $("#f-del").addEventListener("click",function(){
   if(editing){data.events=data.events.filter(function(x){return x.id!==editing.id});save();closeDlg();renderAll()}
