@@ -376,7 +376,7 @@ function initCloud(){
   };
   document.head.appendChild(s);
   $("#syncBtn").addEventListener("click",function(){
-    if(!sync.client)return;
+    if(!sync.client){setStatus("Cloud-bibliotheek niet geladen (controleer je internetverbinding)");return}
     if(sync.user){sync.client.auth.signOut();return}
     $("#loginMsg").textContent="";$("#loginScrim").classList.add("on");
     setTimeout(function(){$("#l-email").focus()},0);
@@ -385,9 +385,9 @@ function initCloud(){
   $("#loginForm").addEventListener("submit",function(e){
     e.preventDefault();$("#loginMsg").textContent="Bezig met inloggen…";
     sync.client.auth.signInWithPassword({email:$("#l-email").value.trim(),password:$("#l-pass").value}).then(function(r){
-      if(r.error){$("#loginMsg").textContent="Inloggen mislukt: controleer je e-mailadres en wachtwoord.";return}
+      if(r.error){$("#loginMsg").textContent="Inloggen mislukt: "+r.error.message;return}
       $("#l-pass").value="";closeLogin();
-    }).catch(function(){$("#loginMsg").textContent="Geen verbinding met de server."});
+    }).catch(function(err){$("#loginMsg").textContent="Geen verbinding met de server: "+(err&&err.message||err)});
   });
   document.addEventListener("keydown",function(e){if(e.key==="Escape")closeLogin()});
   document.addEventListener("visibilitychange",function(){if(!document.hidden)pull()});
