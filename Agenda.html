@@ -8,11 +8,11 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet">
 <style>
-/* Indeling: kalender links (maand/week/dag als tabs), inklapbare to-do-balk rechts. */
+/* Layout: calendar on the left (month/week/day as tabs), collapsible to-do sidebar on the right. */
 :root{
   --bg:#f3f5f7; --surface:#ffffff; --ink:#18202c; --muted:#667085; --line:#e2e6ec;
   --accent:#17727c; --accent-ink:#ffffff; --today:#e6f3f4; --sel:#d3eaec;
-  --c-blauw:#3b6fd4; --c-groen:#2e9a68; --c-oranje:#d4811f; --c-rood:#cc4848; --c-paars:#8657cf;
+  --c-blue:#3b6fd4; --c-green:#2e9a68; --c-orange:#d4811f; --c-red:#cc4848; --c-purple:#8657cf;
   --shadow:0 8px 28px rgba(20,30,50,.16);
   --f-display:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
   --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
@@ -22,14 +22,14 @@
   :root:not([data-theme="light"]){
     --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
     --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
-    --c-blauw:#6c9bf2; --c-groen:#52c28f; --c-oranje:#eba24a; --c-rood:#ee7a7a; --c-paars:#ac85ec;
+    --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec;
     --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
   }
 }
 :root[data-theme="dark"]{
   --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
   --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
-  --c-blauw:#6c9bf2; --c-groen:#52c28f; --c-oranje:#eba24a; --c-rood:#ee7a7a; --c-paars:#ac85ec;
+  --c-blue:#6c9bf2; --c-green:#52c28f; --c-orange:#eba24a; --c-red:#ee7a7a; --c-purple:#ac85ec;
   --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
 }
 *{box-sizing:border-box}
@@ -40,7 +40,7 @@ button{cursor:pointer}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .app{height:100%;display:flex;flex-direction:column}
 
-/* Kop */
+/* Header */
 .top{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
 .title{font:700 20px/1.1 var(--f-display);margin:0 4px 0 0;min-width:0;flex:1 1 220px;text-wrap:balance;text-transform:capitalize}
 .title small{display:block;font:500 12px var(--f-body);color:var(--muted);text-transform:none;margin-top:3px}
@@ -56,12 +56,12 @@ button{cursor:pointer}
 .badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:12px;line-height:20px;text-align:center}
 .btn[aria-expanded="true"]{background:var(--sel);border-color:var(--accent)}
 
-/* Hoofdgedeelte */
+/* Main area */
 .main{flex:1;min-height:0;display:flex;position:relative}
 .cal{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--surface);container-type:inline-size}
 .scroller{flex:1;min-height:0;overflow:auto}
 
-/* Maand */
+/* Month */
 .month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));height:100%;grid-auto-rows:auto}
 .month .dow{padding:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:2}
 .month .cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 5px;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0}
@@ -75,13 +75,13 @@ button{cursor:pointer}
 .cell.today .dnum{background:var(--accent);color:var(--accent-ink)}
 .more{border:0;background:transparent;text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:1px 4px}
 
-/* Chips en blokken met categoriekleur */
-.ev{--c:var(--c-blauw);border:0;text-align:left;width:100%;background:color-mix(in srgb,var(--c) 17%,var(--surface));border-left:3px solid var(--c);border-radius:5px;padding:2px 6px;font-size:12px;line-height:1.3;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
+/* Chips and blocks with category colour */
+.ev{--c:var(--c-blue);border:0;text-align:left;width:100%;background:color-mix(in srgb,var(--c) 17%,var(--surface));border-left:3px solid var(--c);border-radius:5px;padding:2px 6px;font-size:12px;line-height:1.3;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
 .ev:hover{background:color-mix(in srgb,var(--c) 28%,var(--surface))}
 .ev b{font-weight:600;margin-right:4px;color:color-mix(in srgb,var(--c) 70%,var(--ink))}
-.c-blauw{--c:var(--c-blauw)}.c-groen{--c:var(--c-groen)}.c-oranje{--c:var(--c-oranje)}.c-rood{--c:var(--c-rood)}.c-paars{--c:var(--c-paars)}
+.c-blue{--c:var(--c-blue)}.c-green{--c:var(--c-green)}.c-orange{--c:var(--c-orange)}.c-red{--c:var(--c-red)}.c-purple{--c:var(--c-purple)}
 
-/* Week en dag */
+/* Week and day */
 .sticky{position:sticky;top:0;z-index:4;background:var(--surface)}
 .gridrow{display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr))}
 .dayhead{padding:8px 6px;text-align:center;border-left:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;background:transparent;border-top:0;border-right:0;border-radius:0}
@@ -99,10 +99,10 @@ button{cursor:pointer}
 .col.today{background-color:var(--today)}
 .col .ev{position:absolute;white-space:normal;padding:3px 6px;z-index:1;width:auto;box-shadow:0 0 0 1px var(--surface)}
 .col .ev span{display:block;opacity:.85}
-.now{position:absolute;left:0;right:0;height:2px;background:var(--c-rood);z-index:3;pointer-events:none}
-.now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--c-rood)}
+.now{position:absolute;left:0;right:0;height:2px;background:var(--c-red);z-index:3;pointer-events:none}
+.now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--c-red)}
 
-/* To-do-balk */
+/* To-do sidebar */
 .side{width:340px;flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease,margin .22s ease}
 .side[data-open="false"]{width:0;border-left-width:0}
 .side-in{width:340px;display:flex;flex-direction:column;height:100%;min-height:0}
@@ -120,13 +120,13 @@ button{cursor:pointer}
 .todo .x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;padding:0 6px;border-radius:6px;visibility:hidden}
 .todo:hover .x,.todo .x:focus-visible{visibility:visible}
 @media (hover:none){.todo .x{visibility:visible}}
-.todo .x:hover{color:var(--c-rood)}
+.todo .x:hover{color:var(--c-red)}
 .add{display:flex;gap:6px;margin-top:6px}
 .add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px}
 .empty{color:var(--muted);font-size:13px;padding:4px}
 .linkbtn{border:0;background:transparent;color:var(--muted);font-size:12px;text-decoration:underline;padding:0}
 
-/* Dialoog */
+/* Dialog */
 .scrim{position:fixed;inset:0;background:rgba(10,14,20,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
 .scrim.on{display:flex}
 .dlg{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(440px,100%);padding:20px;display:flex;flex-direction:column;gap:12px;max-height:100%;overflow:auto}
@@ -139,10 +139,10 @@ button{cursor:pointer}
 .sw{width:28px;height:28px;border-radius:50%;border:2px solid transparent;background:var(--c);padding:0}
 .sw[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
 .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
-.acts .del{margin-right:auto;color:var(--c-rood)}
+.acts .del{margin-right:auto;color:var(--c-red)}
 .status{font-size:12px;color:var(--muted)}
 
-/* De kalender krimpt mee met zijn eigen breedte */
+/* The calendar adapts to its own width */
 @container (max-width:720px){
   .month .dow{padding:6px 2px;font-size:10px;text-align:center}
   .month .cell{padding:2px 3px}
@@ -160,7 +160,7 @@ button{cursor:pointer}
   .more{font-size:10px;padding:0}
   .col .ev{font-size:10px;padding:1px 3px}
 }
-/* Smalle schermen: balk schuift over de kalender */
+/* Narrow screens: sidebar slides over the calendar */
 @media (max-width:820px){
   .side{position:absolute;right:0;top:0;bottom:0;z-index:10;box-shadow:var(--shadow);max-width:92vw}
   .side-in{width:min(340px,92vw)}
@@ -179,9 +179,9 @@ button{cursor:pointer}
       <button class="btn icon" id="next" aria-label="Volgende">&#8250;</button>
     </div>
     <div class="tabs" role="tablist" aria-label="Weergave">
-      <button role="tab" id="tab-maand" data-view="maand">Maand</button>
+      <button role="tab" id="tab-month" data-view="month">Maand</button>
       <button role="tab" id="tab-week" data-view="week">Week</button>
-      <button role="tab" id="tab-dag" data-view="dag">Dag</button>
+      <button role="tab" id="tab-day" data-view="day">Dag</button>
     </div>
     <button class="btn primary" id="newEv">+ Afspraak</button>
     <button class="btn" id="toggleSide" aria-expanded="true" aria-controls="side">To-do's<span class="badge" id="badge">0</span></button>
@@ -215,11 +215,11 @@ button{cursor:pointer}
     </div>
     <div class="fld">Kleur
       <div class="swatches" role="radiogroup" aria-label="Kleur" id="swatches">
-        <button type="button" class="sw c-blauw" role="radio" data-c="blauw" aria-label="Blauw"></button>
-        <button type="button" class="sw c-groen" role="radio" data-c="groen" aria-label="Groen"></button>
-        <button type="button" class="sw c-oranje" role="radio" data-c="oranje" aria-label="Oranje"></button>
-        <button type="button" class="sw c-rood" role="radio" data-c="rood" aria-label="Rood"></button>
-        <button type="button" class="sw c-paars" role="radio" data-c="paars" aria-label="Paars"></button>
+        <button type="button" class="sw c-blue" role="radio" data-c="blue" aria-label="Blauw"></button>
+        <button type="button" class="sw c-green" role="radio" data-c="green" aria-label="Groen"></button>
+        <button type="button" class="sw c-orange" role="radio" data-c="orange" aria-label="Oranje"></button>
+        <button type="button" class="sw c-red" role="radio" data-c="red" aria-label="Rood"></button>
+        <button type="button" class="sw c-purple" role="radio" data-c="purple" aria-label="Paars"></button>
       </div>
     </div>
     <div class="acts">
@@ -252,21 +252,22 @@ function isoWeek(s){var d=parse(s);d.setDate(d.getDate()+3-((d.getDay()+6)%7));v
 
 var todayStr=ymd(new Date());
 var ui={view:"week",cursor:todayStr,side:null};
-try{var u=JSON.parse(localStorage.getItem(UIKEY)||"null");if(u){if(u.view)ui.view=u.view;if(typeof u.side==="boolean")ui.side=u.side}}catch(e){}
+var VIEW_MIGRATE={maand:"month",dag:"day"};
+try{var u=JSON.parse(localStorage.getItem(UIKEY)||"null");if(u){if(u.view)ui.view=VIEW_MIGRATE[u.view]||u.view;if(typeof u.side==="boolean")ui.side=u.side}}catch(e){}
 if(ui.side===null)ui.side=window.innerWidth>820;
-var h=(location.hash||"").slice(1);if(h==="maand"||h==="week"||h==="dag")ui.view=h;
+var h=(location.hash||"").slice(1);if(h==="month"||h==="week"||h==="day")ui.view=h;
 function saveUi(){try{localStorage.setItem(UIKEY,JSON.stringify({view:ui.view,side:ui.side}))}catch(e){}}
 
-/* Gegevens */
+/* Data */
 function seed(){
   var t=todayStr;
   return {
     events:[
-      {id:uid(),title:"Voorbeeld: ontbijtafspraak",date:t,start:"09:00",end:"10:00",allDay:false,color:"oranje"},
-      {id:uid(),title:"Voorbeeld: project overleg",date:t,start:"13:30",end:"15:00",allDay:false,color:"blauw"},
-      {id:uid(),title:"Voorbeeld: sporten",date:addDays(t,1),start:"18:00",end:"19:00",allDay:false,color:"groen"},
-      {id:uid(),title:"Voorbeeld: tandarts",date:addDays(t,3),start:"11:00",end:"11:45",allDay:false,color:"rood"},
-      {id:uid(),title:"Voorbeeld: weekendje weg",date:addDays(t,6),start:"00:00",end:"23:59",allDay:true,color:"paars"}
+      {id:uid(),title:"Voorbeeld: ontbijtafspraak",date:t,start:"09:00",end:"10:00",allDay:false,color:"orange"},
+      {id:uid(),title:"Voorbeeld: project overleg",date:t,start:"13:30",end:"15:00",allDay:false,color:"blue"},
+      {id:uid(),title:"Voorbeeld: sporten",date:addDays(t,1),start:"18:00",end:"19:00",allDay:false,color:"green"},
+      {id:uid(),title:"Voorbeeld: tandarts",date:addDays(t,3),start:"11:00",end:"11:45",allDay:false,color:"red"},
+      {id:uid(),title:"Voorbeeld: weekendje weg",date:addDays(t,6),start:"00:00",end:"23:59",allDay:true,color:"purple"}
     ],
     todos:[
       {id:uid(),text:"Voorbeeld: boodschappen doen",done:false,date:t},
@@ -279,21 +280,24 @@ function seed(){
 var data=null;
 try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
 if(!data||!Array.isArray(data.events)||!Array.isArray(data.todos))data=seed();
+/* Migrate colour names stored by earlier (Dutch) versions */
+var COLOR_MIGRATE={blauw:"blue",groen:"green",oranje:"orange",rood:"red",paars:"purple"};
+data.events.forEach(function(e){if(COLOR_MIGRATE[e.color])e.color=COLOR_MIGRATE[e.color]});
 var store=null,timer=null;
 function save(){
   try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
   if(store){clearTimeout(timer);timer=setTimeout(function(){try{Promise.resolve(store.set(data)).catch(function(){})}catch(e){}},500)}
 }
 
-/* Afspraken die ik voor je toevoeg; elk komt maar één keer in je agenda */
+/* Events added on your behalf; each one is added to the calendar only once */
 var PRESETS=[
-  {id:"p-babyborrel-20261121",title:"Baby borrel L & B",date:"2026-11-21",start:"15:00",end:"17:00",allDay:false,color:"oranje"}
+  {id:"p-babyborrel-20261121",title:"Baby borrel L & B",date:"2026-11-21",start:"15:00",end:"17:00",allDay:false,color:"orange"}
 ];
 data.applied=data.applied||[];
 PRESETS.forEach(function(p){if(data.applied.indexOf(p.id)<0){data.applied.push(p.id);data.events.push(Object.assign({},p))}});
 save();
 
-/* Hulpfuncties */
+/* Helpers */
 function eventsOn(d){
   return data.events.filter(function(e){return e.date===d}).sort(function(a,b){
     return (b.allDay?1:0)-(a.allDay?1:0)||toMin(a.start)-toMin(b.start)});
@@ -303,24 +307,24 @@ function evChip(e){
   return '<button class="ev c-'+esc(e.color)+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+esc(e.title)+"</button>";
 }
 function visibleDays(){
-  if(ui.view==="dag")return [ui.cursor];
+  if(ui.view==="day")return [ui.cursor];
   var m=mondayOf(ui.cursor),a=[];for(var i=0;i<7;i++)a.push(addDays(m,i));return a;
 }
 
-/* Kop */
+/* Header */
 function renderHead(){
   var t,s="";
-  if(ui.view==="maand"){t=fMonth(ui.cursor)}
+  if(ui.view==="month"){t=fMonth(ui.cursor)}
   else if(ui.view==="week"){var d=visibleDays();t=fDm(d[0])+" – "+fDmy(d[6]);s="Week "+isoWeek(d[0])}
   else{t=fLong(ui.cursor);s="Week "+isoWeek(ui.cursor)}
   $("#title").firstChild.nodeValue=t;
   $("#subtitle").textContent=s;
-  ["maand","week","dag"].forEach(function(v){$("#tab-"+v).setAttribute("aria-selected",String(ui.view===v))});
+  ["month","week","day"].forEach(function(v){$("#tab-"+v).setAttribute("aria-selected",String(ui.view===v))});
   var open=data.todos.filter(function(x){return !x.done&&x.date===ui.cursor}).length;
   $("#badge").textContent=open;
 }
 
-/* Maand */
+/* Month */
 function renderMonth(){
   var first=ui.cursor.slice(0,8)+"01";
   var start=mondayOf(first);
@@ -340,7 +344,7 @@ function renderMonth(){
   $("#scroller").innerHTML=html+"</div>";
 }
 
-/* Week / dag */
+/* Week / day */
 function pack(list){
   list.sort(function(a,b){return a.s-b.s||b.t-a.t});
   var out=[],cl=[],end=-1;
@@ -383,9 +387,9 @@ function renderGrid(){
   sc.scrollTop=first?7*HOUR:prev;
 }
 
-function renderCal(){ui.view==="maand"?renderMonth():renderGrid()}
+function renderCal(){ui.view==="month"?renderMonth():renderGrid()}
 
-/* To-do's */
+/* To-dos */
 function todoItem(x){
   return '<div class="todo'+(x.done?" done":"")+'"><input type="checkbox" id="t-'+x.id+'" data-todo="'+x.id+'"'+(x.done?" checked":"")+'><label for="t-'+x.id+'">'+esc(x.text)+'</label><button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>';
 }
@@ -415,17 +419,17 @@ function applySide(){
 
 function renderAll(){renderHead();renderCal();renderTodos();applySide()}
 
-/* Navigatie */
+/* Navigation */
 function shift(dir){
-  if(ui.view==="maand"){var d=parse(ui.cursor);d.setDate(1);d.setMonth(d.getMonth()+dir);ui.cursor=ymd(d)}
+  if(ui.view==="month"){var d=parse(ui.cursor);d.setDate(1);d.setMonth(d.getMonth()+dir);ui.cursor=ymd(d)}
   else if(ui.view==="week")ui.cursor=addDays(ui.cursor,7*dir);
   else ui.cursor=addDays(ui.cursor,dir);
   renderAll();
 }
 function setView(v,d){ui.view=v;if(d)ui.cursor=d;saveUi();try{history.replaceState(null,"","#"+v)}catch(e){try{location.hash=v}catch(_){}}renderAll()}
 
-/* Dialoog */
-var editing=null,color="blauw";
+/* Dialog */
+var editing=null,color="blue";
 function setColor(c){color=c;document.querySelectorAll(".sw").forEach(function(b){b.setAttribute("aria-checked",String(b.dataset.c===c))})}
 function syncAll(){$("#timeRow").style.display=$("#f-all").checked?"none":"grid"}
 function openDlg(e,def){
@@ -437,7 +441,7 @@ function openDlg(e,def){
   $("#f-all").checked=!!v.allDay;
   $("#f-start").value=v.start||"09:00";
   $("#f-end").value=v.end||"10:00";
-  setColor(v.color||"blauw");
+  setColor(v.color||"blue");
   $("#f-del").style.display=e?"":"none";
   syncAll();
   $("#scrim").classList.add("on");
@@ -462,21 +466,21 @@ $("#swatches").addEventListener("click",function(e){var b=e.target.closest(".sw"
 $("#scrim").addEventListener("mousedown",function(e){if(e.target===$("#scrim"))closeDlg()});
 document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("#scrim").classList.contains("on"))closeDlg()});
 
-/* Kalender-interacties */
+/* Calendar interactions */
 $("#scroller").addEventListener("click",function(e){
   var t=e.target;
   var ev=t.closest("[data-ev]");
   if(ev){var f=data.events.find(function(x){return x.id===ev.dataset.ev});if(f)openDlg(f);return}
-  var g=t.closest("[data-goday]");if(g){setView("dag",g.dataset.goday);return}
-  var p=t.closest("[data-pick]");if(p){ui.cursor=p.dataset.pick;if(ui.view==="dag")return;renderAll();return}
+  var g=t.closest("[data-goday]");if(g){setView("day",g.dataset.goday);return}
+  var p=t.closest("[data-pick]");if(p){ui.cursor=p.dataset.pick;if(ui.view==="day")return;renderAll();return}
   var col=t.closest("[data-col]");
   if(col){
     var r=col.getBoundingClientRect(),m=Math.floor((e.clientY-r.top)/HOUR*2)*30;
     ui.cursor=col.dataset.col;
-    openDlg(null,{date:col.dataset.col,start:fromMin(m),end:fromMin(m+60),color:"blauw"});return;
+    openDlg(null,{date:col.dataset.col,start:fromMin(m),end:fromMin(m+60),color:"blue"});return;
   }
   var ac=t.closest("[data-new-all]");
-  if(ac){ui.cursor=ac.dataset.newAll;openDlg(null,{date:ac.dataset.newAll,allDay:true,color:"blauw"});return}
+  if(ac){ui.cursor=ac.dataset.newAll;openDlg(null,{date:ac.dataset.newAll,allDay:true,color:"blue"});return}
   var cell=t.closest("[data-day]");
   if(cell){ui.cursor=cell.dataset.day;renderAll()}
 });
@@ -485,7 +489,7 @@ $("#scroller").addEventListener("dblclick",function(e){
   if(cell&&!e.target.closest("[data-ev]")){ui.cursor=cell.dataset.day;openDlg(null,{date:cell.dataset.day})}
 });
 
-/* To-do-interacties */
+/* To-do interactions */
 $("#todos").addEventListener("change",function(e){
   var id=e.target.dataset.todo;if(!id)return;
   var x=data.todos.find(function(t){return t.id===id});if(x){x.done=e.target.checked;save();renderHead();renderTodos()}
@@ -504,7 +508,7 @@ $("#todos").addEventListener("submit",function(e){
   var again=document.getElementById(f.dataset.add==="day"?"add-day":"add-gen");if(again)again.focus();
 });
 
-/* Kopknoppen */
+/* Header buttons */
 $("#prev").addEventListener("click",function(){shift(-1)});
 $("#next").addEventListener("click",function(){shift(1)});
 $("#today").addEventListener("click",function(){ui.cursor=todayStr;renderAll()});
@@ -513,9 +517,9 @@ $("#newEv").addEventListener("click",function(){openDlg(null,{date:ui.cursor})})
 function toggleSide(){ui.side=!ui.side;saveUi();applySide()}
 $("#toggleSide").addEventListener("click",toggleSide);
 $("#closeSide").addEventListener("click",function(){ui.side=false;saveUi();applySide();$("#toggleSide").focus()});
-window.addEventListener("hashchange",function(){var v=(location.hash||"").slice(1);if((v==="maand"||v==="week"||v==="dag")&&v!==ui.view){ui.view=v;saveUi();renderAll()}});
+window.addEventListener("hashchange",function(){var v=(location.hash||"").slice(1);if((v==="month"||v==="week"||v==="day")&&v!==ui.view){ui.view=v;saveUi();renderAll()}});
 
-/* Rode lijn voor het huidige tijdstip bijwerken */
+/* Update the red current-time line */
 setInterval(function(){
   var n=document.querySelector(".now");
   if(n){var d=new Date();n.style.top=((d.getHours()*60+d.getMinutes())/60*HOUR)+"px"}
@@ -523,13 +527,13 @@ setInterval(function(){
 
 renderAll();
 
-/* Opnieuw tekenen als het venster of de kalender van grootte verandert */
+/* Redraw when the window or calendar changes size */
 var rt=null,lastW=0,lastH=0;
 function onSize(){
   var sc=$("#scroller");if(!sc)return;
   if(sc.clientWidth===lastW&&sc.clientHeight===lastH)return;
   lastW=sc.clientWidth;lastH=sc.clientHeight;
-  clearTimeout(rt);rt=setTimeout(function(){if(ui.view!=="maand")renderGrid()},80);
+  clearTimeout(rt);rt=setTimeout(function(){if(ui.view!=="month")renderGrid()},80);
 }
 if(window.ResizeObserver){new ResizeObserver(onSize).observe($("#scroller"))}
 window.addEventListener("resize",onSize);
