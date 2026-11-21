@@ -132,7 +132,7 @@ button{cursor:pointer}
 .dlg{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(440px,100%);padding:20px;display:flex;flex-direction:column;gap:12px;max-height:100%;overflow:auto}
 .dlg h2{margin:0;font:700 18px var(--f-display)}
 .fld{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
-.fld input[type=text],.fld input[type=date],.fld input[type=time]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:14px}
+.fld input[type=text],.fld input[type=date],.fld input[type=time],.fld input[type=email],.fld input[type=password]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:14px}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
 .chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink);font-weight:500}
 .swatches{display:flex;gap:8px}
@@ -141,6 +141,7 @@ button{cursor:pointer}
 .acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
 .acts .del{margin-right:auto;color:var(--c-red)}
 .status{font-size:12px;color:var(--muted)}
+[hidden]{display:none!important}
 
 /* The calendar adapts to its own width */
 @container (max-width:720px){
@@ -165,6 +166,7 @@ button{cursor:pointer}
   .side{position:absolute;right:0;top:0;bottom:0;z-index:10;box-shadow:var(--shadow);max-width:92vw}
   .side-in{width:min(340px,92vw)}
   .top{padding:10px 12px}
+  #syncStatus{display:none}
 }
 @media (prefers-reduced-motion:reduce){.side{transition:none}}
 </style>
@@ -185,6 +187,8 @@ button{cursor:pointer}
     </div>
     <button class="btn primary" id="newEv">+ Afspraak</button>
     <button class="btn" id="toggleSide" aria-expanded="true" aria-controls="side">To-do's<span class="badge" id="badge">0</span></button>
+    <span class="status" id="syncStatus" role="status" hidden></span>
+    <button class="btn" id="syncBtn" hidden>Inloggen</button>
   </header>
 
   <div class="main">
@@ -226,6 +230,19 @@ button{cursor:pointer}
       <button type="button" class="btn del" id="f-del">Verwijderen</button>
       <button type="button" class="btn" id="f-cancel">Annuleren</button>
       <button type="submit" class="btn primary">Opslaan</button>
+    </div>
+  </form>
+</div>
+
+<div class="scrim" id="loginScrim">
+  <form class="dlg" id="loginForm" role="dialog" aria-modal="true" aria-labelledby="loginTitle">
+    <h2 id="loginTitle">Inloggen</h2>
+    <label class="fld">E-mailadres<input type="email" id="l-email" required autocomplete="username"></label>
+    <label class="fld">Wachtwoord<input type="password" id="l-pass" required autocomplete="current-password"></label>
+    <div class="status" id="loginMsg" role="status"></div>
+    <div class="acts">
+      <button type="button" class="btn" id="l-cancel">Annuleren</button>
+      <button type="submit" class="btn primary">Inloggen</button>
     </div>
   </form>
 </div>
@@ -279,23 +296,115 @@ function seed(){
 }
 var data=null;
 try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
-if(!data||!Array.isArray(data.events)||!Array.isArray(data.todos))data=seed();
+if(!data||!Array.isArray(data.events)||!Array.isArray(data.todos)){
+  data=seed();
+  data.events.concat(data.todos).forEach(function(x){x.seed=true}); /* example items are never uploaded to the cloud */
+}
 /* Migrate colour names stored by earlier (Dutch) versions */
 var COLOR_MIGRATE={blauw:"blue",groen:"green",oranje:"orange",rood:"red",paars:"purple"};
 data.events.forEach(function(e){if(COLOR_MIGRATE[e.color])e.color=COLOR_MIGRATE[e.color]});
-var store=null,timer=null;
-function save(){
-  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
-  if(store){clearTimeout(timer);timer=setTimeout(function(){try{Promise.resolve(store.set(data)).catch(function(){})}catch(e){}},500)}
+
+/* Cloud sync (Supabase). Leave URL or key empty to keep everything on this device only. */
+var SUPABASE_URL="";
+var SUPABASE_KEY="sb_publishable_OSzi_SMjJuKx9nDrA7UIfA_telqAWBY";
+var DIRTYKEY="agenda-dirty-v1", SYNCEDKEY="agenda-synced-user-v1";
+var sync={client:null,user:null,busy:false,timer:null,ver:0};
+function isDirty(){try{return localStorage.getItem(DIRTYKEY)==="1"}catch(e){return false}}
+function setDirty(v){try{v?localStorage.setItem(DIRTYKEY,"1"):localStorage.removeItem(DIRTYKEY)}catch(e){}}
+function persistLocal(){try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}}
+/* Call after every real change: store locally, mark as not yet uploaded, upload shortly after */
+function save(){persistLocal();sync.ver++;setDirty(true);schedulePush()}
+function setStatus(t){$("#syncStatus").textContent=t}
+function updateSyncUi(){
+  $("#syncBtn").textContent=sync.user?"Uitloggen":"Inloggen";
+  if(!sync.user)setStatus("Alleen op dit apparaat");
+}
+function schedulePush(){
+  if(!sync.user)return;
+  clearTimeout(sync.timer);sync.timer=setTimeout(push,800);
+}
+function push(){
+  if(!sync.user)return Promise.resolve();
+  var ver=sync.ver;
+  setStatus("Opslaan…");
+  return sync.client.from("agenda_data").upsert({user_id:sync.user.id,data:data,updated_at:new Date().toISOString()}).then(function(r){
+    if(r.error)throw r.error;
+    if(ver===sync.ver)setDirty(false); /* nothing changed while uploading */
+    try{localStorage.setItem(SYNCEDKEY,sync.user.id)}catch(e){}
+    setStatus("Gesynchroniseerd");
+  }).catch(function(){setStatus("Niet gesynchroniseerd (offline?)")});
+}
+/* Add local items that the cloud copy does not have yet (used the first time a device logs in) */
+function union(remote,local){
+  ["events","todos"].forEach(function(k){
+    var ids={};remote[k].forEach(function(x){ids[x.id]=1});
+    local[k].forEach(function(x){if(!ids[x.id]&&!x.seed)remote[k].push(x)});
+  });
+  remote.applied=(remote.applied||[]).concat((local.applied||[]).filter(function(id){return (remote.applied||[]).indexOf(id)<0}));
+  return remote;
+}
+function pull(){
+  if(!sync.user||sync.busy||$("#scrim").classList.contains("on"))return Promise.resolve();
+  sync.busy=true;setStatus("Synchroniseren…");
+  return sync.client.from("agenda_data").select("data").maybeSingle().then(function(r){
+    if(r.error)throw r.error;
+    var remote=r.data&&r.data.data;
+    var valid=remote&&Array.isArray(remote.events)&&Array.isArray(remote.todos);
+    var known=localStorage.getItem(SYNCEDKEY)===sync.user.id;
+    if(!valid||(known&&isDirty()))return push();      /* nothing in the cloud yet, or local changes win */
+    data=known?remote:union(remote,data);              /* first login on this device merges both */
+    if(applyPresets())sync.ver++;
+    persistLocal();renderAll();
+    if(!known||isDirty())return push();
+    setStatus("Gesynchroniseerd");
+  }).catch(function(){setStatus("Niet gesynchroniseerd (offline?)")}).then(function(){sync.busy=false});
+}
+function closeLogin(){$("#loginScrim").classList.remove("on")}
+function initCloud(){
+  if(!SUPABASE_URL||!SUPABASE_KEY)return;
+  $("#syncBtn").hidden=false;$("#syncStatus").hidden=false;updateSyncUi();
+  var s=document.createElement("script");
+  s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js";
+  s.onerror=function(){setStatus("Cloud niet bereikbaar")};
+  s.onload=function(){
+    sync.client=window.supabase.createClient(SUPABASE_URL,SUPABASE_KEY);
+    sync.client.auth.onAuthStateChange(function(ev,session){
+      sync.user=session?session.user:null;updateSyncUi();
+      /* do not call Supabase inside this callback: defer */
+      if(sync.user&&(ev==="SIGNED_IN"||ev==="INITIAL_SESSION"))setTimeout(pull,0);
+    });
+  };
+  document.head.appendChild(s);
+  $("#syncBtn").addEventListener("click",function(){
+    if(!sync.client)return;
+    if(sync.user){sync.client.auth.signOut();return}
+    $("#loginMsg").textContent="";$("#loginScrim").classList.add("on");
+    setTimeout(function(){$("#l-email").focus()},0);
+  });
+  $("#l-cancel").addEventListener("click",closeLogin);
+  $("#loginForm").addEventListener("submit",function(e){
+    e.preventDefault();$("#loginMsg").textContent="Bezig met inloggen…";
+    sync.client.auth.signInWithPassword({email:$("#l-email").value.trim(),password:$("#l-pass").value}).then(function(r){
+      if(r.error){$("#loginMsg").textContent="Inloggen mislukt: controleer je e-mailadres en wachtwoord.";return}
+      $("#l-pass").value="";closeLogin();
+    }).catch(function(){$("#loginMsg").textContent="Geen verbinding met de server."});
+  });
+  document.addEventListener("keydown",function(e){if(e.key==="Escape")closeLogin()});
+  document.addEventListener("visibilitychange",function(){if(!document.hidden)pull()});
+  window.addEventListener("online",pull);
 }
 
-/* Events added on your behalf; each one is added to the calendar only once */
+/* Events added on your behalf; each one is added to the calendar only once. Returns true if something was added. */
 var PRESETS=[
   {id:"p-babyborrel-20261121",title:"Baby borrel L & B",date:"2026-11-21",start:"15:00",end:"17:00",allDay:false,color:"orange"}
 ];
-data.applied=data.applied||[];
-PRESETS.forEach(function(p){if(data.applied.indexOf(p.id)<0){data.applied.push(p.id);data.events.push(Object.assign({},p))}});
-save();
+function applyPresets(){
+  var added=false;
+  data.applied=data.applied||[];
+  PRESETS.forEach(function(p){if(data.applied.indexOf(p.id)<0){data.applied.push(p.id);data.events.push(Object.assign({},p));added=true}});
+  return added;
+}
+if(applyPresets())save();else persistLocal();
 
 /* Helpers */
 function eventsOn(d){
@@ -526,6 +635,7 @@ setInterval(function(){
 },60000);
 
 renderAll();
+initCloud();
 
 /* Redraw when the window or calendar changes size */
 var rt=null,lastW=0,lastH=0;
