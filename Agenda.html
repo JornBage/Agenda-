@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mijn Agenda</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&display=swap" rel="stylesheet">
+<style>
+/* Indeling: kalender links (maand/week/dag als tabs), inklapbare to-do-balk rechts. */
+:root{
+  --bg:#f3f5f7; --surface:#ffffff; --ink:#18202c; --muted:#667085; --line:#e2e6ec;
+  --accent:#17727c; --accent-ink:#ffffff; --today:#e6f3f4; --sel:#d3eaec;
+  --c-blauw:#3b6fd4; --c-groen:#2e9a68; --c-oranje:#d4811f; --c-rood:#cc4848; --c-paars:#8657cf;
+  --shadow:0 8px 28px rgba(20,30,50,.16);
+  --f-display:"Bricolage Grotesque","Instrument Sans",system-ui,sans-serif;
+  --f-body:"Instrument Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
+    --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
+    --c-blauw:#6c9bf2; --c-groen:#52c28f; --c-oranje:#eba24a; --c-rood:#ee7a7a; --c-paars:#ac85ec;
+    --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#11151b; --surface:#181e27; --ink:#e8ecf3; --muted:#9aa4b6; --line:#2a323f;
+  --accent:#4fb6c1; --accent-ink:#0b1417; --today:#17303a; --sel:#1f4450;
+  --c-blauw:#6c9bf2; --c-groen:#52c28f; --c-oranje:#eba24a; --c-rood:#ee7a7a; --c-paars:#ac85ec;
+  --shadow:0 8px 28px rgba(0,0,0,.5); color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{background:var(--bg);color:var(--ink);font:14px/1.4 var(--f-body);font-variant-numeric:tabular-nums}
+button,input,select{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:flex;flex-direction:column}
+
+/* Kop */
+.top{display:flex;align-items:center;gap:12px;padding:12px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.title{font:700 20px/1.1 var(--f-display);margin:0 4px 0 0;min-width:0;flex:1 1 220px;text-wrap:balance;text-transform:capitalize}
+.title small{display:block;font:500 12px var(--f-body);color:var(--muted);text-transform:none;margin-top:3px}
+.nav{display:flex;gap:6px;align-items:center}
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:7px 12px;font-weight:600}
+.btn:hover{background:var(--bg)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.icon{padding:7px 10px;line-height:1}
+.tabs{display:inline-flex;background:var(--bg);border:1px solid var(--line);border-radius:10px;padding:3px}
+.tabs button{border:0;background:transparent;padding:6px 16px;border-radius:7px;font-weight:600;color:var(--muted)}
+.tabs button[aria-selected="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 3px rgba(20,30,50,.18)}
+.badge{display:inline-block;min-width:20px;padding:0 6px;margin-left:6px;border-radius:10px;background:var(--accent);color:var(--accent-ink);font-size:12px;line-height:20px;text-align:center}
+.btn[aria-expanded="true"]{background:var(--sel);border-color:var(--accent)}
+
+/* Hoofdgedeelte */
+.main{flex:1;min-height:0;display:flex;position:relative}
+.cal{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--surface);container-type:inline-size}
+.scroller{flex:1;min-height:0;overflow:auto}
+
+/* Maand */
+.month{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));height:100%;grid-auto-rows:auto}
+.month .dow{padding:8px;font-size:12px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;border-bottom:1px solid var(--line);background:var(--surface);position:sticky;top:0;z-index:2}
+.month .cell{border-right:1px solid var(--line);border-bottom:1px solid var(--line);padding:4px 5px;min-height:0;overflow:hidden;display:flex;flex-direction:column;gap:2px;cursor:pointer;min-width:0}
+.month .cell:nth-child(7n+7){border-right:0}
+.month .cell.other{background:color-mix(in srgb,var(--bg) 55%,var(--surface))}
+.month .cell.other .dnum{color:var(--muted)}
+.month .cell.today{background:var(--today)}
+.month .cell.sel{box-shadow:inset 0 0 0 2px var(--accent)}
+.dnum{align-self:flex-start;border:0;background:transparent;font-weight:600;font-size:13px;border-radius:50%;width:26px;height:26px;display:grid;place-items:center;padding:0}
+.dnum:hover{background:var(--sel)}
+.cell.today .dnum{background:var(--accent);color:var(--accent-ink)}
+.more{border:0;background:transparent;text-align:left;font-size:12px;color:var(--muted);font-weight:600;padding:1px 4px}
+
+/* Chips en blokken met categoriekleur */
+.ev{--c:var(--c-blauw);border:0;text-align:left;width:100%;background:color-mix(in srgb,var(--c) 17%,var(--surface));border-left:3px solid var(--c);border-radius:5px;padding:2px 6px;font-size:12px;line-height:1.3;color:var(--ink);overflow:hidden;white-space:nowrap;text-overflow:ellipsis;display:block}
+.ev:hover{background:color-mix(in srgb,var(--c) 28%,var(--surface))}
+.ev b{font-weight:600;margin-right:4px;color:color-mix(in srgb,var(--c) 70%,var(--ink))}
+.c-blauw{--c:var(--c-blauw)}.c-groen{--c:var(--c-groen)}.c-oranje{--c:var(--c-oranje)}.c-rood{--c:var(--c-rood)}.c-paars{--c:var(--c-paars)}
+
+/* Week en dag */
+.sticky{position:sticky;top:0;z-index:4;background:var(--surface)}
+.gridrow{display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr))}
+.dayhead{padding:8px 6px;text-align:center;border-left:1px solid var(--line);border-bottom:1px solid var(--line);cursor:pointer;background:transparent;border-top:0;border-right:0;border-radius:0}
+.dayhead .dw{display:block;font-size:12px;color:var(--muted);text-transform:uppercase;font-weight:600;letter-spacing:.04em}
+.dayhead .dn{display:inline-grid;place-items:center;width:32px;height:32px;border-radius:50%;font:700 18px var(--f-display);margin-top:2px}
+.dayhead.today .dn{background:var(--accent);color:var(--accent-ink)}
+.dayhead.sel:not(.today) .dn{background:var(--sel)}
+.alldayrow .gl,.gutter .hl{font-size:11px;color:var(--muted);text-align:right;padding-right:8px}
+.alldayrow{border-bottom:1px solid var(--line)}
+.alldayrow .gl{padding-top:6px}
+.alldayrow .ac{border-left:1px solid var(--line);padding:3px;display:flex;flex-direction:column;gap:2px;min-height:30px}
+.gridbody .gutter{position:relative}
+.gutter .hl{position:absolute;right:0;width:100%;transform:translateY(-50%)}
+.col{position:relative;border-left:1px solid var(--line);background-image:repeating-linear-gradient(to bottom,var(--line) 0,var(--line) 1px,transparent 1px,transparent var(--hour));cursor:cell}
+.col.today{background-color:var(--today)}
+.col .ev{position:absolute;white-space:normal;padding:3px 6px;z-index:1;width:auto;box-shadow:0 0 0 1px var(--surface)}
+.col .ev span{display:block;opacity:.85}
+.now{position:absolute;left:0;right:0;height:2px;background:var(--c-rood);z-index:3;pointer-events:none}
+.now::before{content:"";position:absolute;left:-4px;top:-3px;width:8px;height:8px;border-radius:50%;background:var(--c-rood)}
+
+/* To-do-balk */
+.side{width:340px;flex:none;background:var(--surface);border-left:1px solid var(--line);display:flex;flex-direction:column;overflow:hidden;transition:width .22s ease,margin .22s ease}
+.side[data-open="false"]{width:0;border-left-width:0}
+.side-in{width:340px;display:flex;flex-direction:column;height:100%;min-height:0}
+.side-head{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 8px}
+.side-head h2{font:700 17px var(--f-display);margin:0}
+.side-scroll{flex:1;min-height:0;overflow:auto;padding:0 16px 16px}
+.sec{margin-top:12px}
+.sec h3{display:flex;justify-content:space-between;align-items:baseline;margin:0 0 6px;font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted)}
+.sec h3 em{font-style:normal;text-transform:none;letter-spacing:0;font-weight:600}
+.todo{display:flex;align-items:flex-start;gap:8px;padding:6px 4px;border-radius:8px}
+.todo:hover{background:var(--bg)}
+.todo input{margin-top:3px;width:17px;height:17px;accent-color:var(--accent);flex:none}
+.todo label{flex:1;min-width:0;word-break:break-word;cursor:pointer}
+.todo.done label{color:var(--muted);text-decoration:line-through}
+.todo .x{border:0;background:transparent;color:var(--muted);font-size:18px;line-height:1;padding:0 6px;border-radius:6px;visibility:hidden}
+.todo:hover .x,.todo .x:focus-visible{visibility:visible}
+@media (hover:none){.todo .x{visibility:visible}}
+.todo .x:hover{color:var(--c-rood)}
+.add{display:flex;gap:6px;margin-top:6px}
+.add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px}
+.empty{color:var(--muted);font-size:13px;padding:4px}
+.linkbtn{border:0;background:transparent;color:var(--muted);font-size:12px;text-decoration:underline;padding:0}
+
+/* Dialoog */
+.scrim{position:fixed;inset:0;background:rgba(10,14,20,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
+.scrim.on{display:flex}
+.dlg{background:var(--surface);border-radius:14px;box-shadow:var(--shadow);width:min(440px,100%);padding:20px;display:flex;flex-direction:column;gap:12px;max-height:100%;overflow:auto}
+.dlg h2{margin:0;font:700 18px var(--f-display)}
+.fld{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600;color:var(--muted)}
+.fld input[type=text],.fld input[type=date],.fld input[type=time]{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px;color:var(--ink);font-weight:400;font-size:14px}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.chk{display:flex;gap:8px;align-items:center;font-size:14px;color:var(--ink);font-weight:500}
+.swatches{display:flex;gap:8px}
+.sw{width:28px;height:28px;border-radius:50%;border:2px solid transparent;background:var(--c);padding:0}
+.sw[aria-checked="true"]{border-color:var(--ink);box-shadow:0 0 0 2px var(--surface) inset}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:4px}
+.acts .del{margin-right:auto;color:var(--c-rood)}
+.status{font-size:12px;color:var(--muted)}
+
+/* De kalender krimpt mee met zijn eigen breedte */
+@container (max-width:720px){
+  .month .dow{padding:6px 2px;font-size:10px;text-align:center}
+  .month .cell{padding:2px 3px}
+  .dnum{width:22px;height:22px;font-size:12px}
+  .ev{font-size:11px;padding:1px 4px}
+  .ev b{display:none}
+  .gridrow{grid-template-columns:38px repeat(var(--n),minmax(0,1fr))}
+  .alldayrow .gl,.gutter .hl{font-size:10px;padding-right:4px}
+  .dayhead{padding:6px 2px}
+  .dayhead .dw{font-size:10px}
+  .dayhead .dn{width:26px;height:26px;font:700 15px var(--f-display)}
+}
+@container (max-width:460px){
+  .month .cell .ev{font-size:0;height:6px;min-height:6px;padding:0;border-left-width:0;border-radius:3px;background:var(--c)}
+  .more{font-size:10px;padding:0}
+  .col .ev{font-size:10px;padding:1px 3px}
+}
+/* Smalle schermen: balk schuift over de kalender */
+@media (max-width:820px){
+  .side{position:absolute;right:0;top:0;bottom:0;z-index:10;box-shadow:var(--shadow);max-width:92vw}
+  .side-in{width:min(340px,92vw)}
+  .top{padding:10px 12px}
+}
+@media (prefers-reduced-motion:reduce){.side{transition:none}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <h1 class="title" id="title">Agenda<small id="subtitle"></small></h1>
+    <div class="nav">
+      <button class="btn icon" id="prev" aria-label="Vorige">&#8249;</button>
+      <button class="btn" id="today">Vandaag</button>
+      <button class="btn icon" id="next" aria-label="Volgende">&#8250;</button>
+    </div>
+    <div class="tabs" role="tablist" aria-label="Weergave">
+      <button role="tab" id="tab-maand" data-view="maand">Maand</button>
+      <button role="tab" id="tab-week" data-view="week">Week</button>
+      <button role="tab" id="tab-dag" data-view="dag">Dag</button>
+    </div>
+    <button class="btn primary" id="newEv">+ Afspraak</button>
+    <button class="btn" id="toggleSide" aria-expanded="true" aria-controls="side">To-do's<span class="badge" id="badge">0</span></button>
+  </header>
+
+  <div class="main">
+    <section class="cal"><div class="scroller" id="scroller"></div></section>
+    <aside class="side" id="side" data-open="true" aria-label="To-do-lijst">
+      <div class="side-in">
+        <div class="side-head">
+          <h2>To-do's</h2>
+          <button class="btn icon" id="closeSide" aria-label="To-do-balk sluiten">&#10005;</button>
+        </div>
+        <div class="side-scroll" id="todos"></div>
+      </div>
+    </aside>
+  </div>
+</div>
+
+<div class="scrim" id="scrim">
+  <form class="dlg" id="form" role="dialog" aria-modal="true" aria-labelledby="dlgTitle">
+    <h2 id="dlgTitle">Nieuwe afspraak</h2>
+    <label class="fld">Titel<input type="text" id="f-title" required maxlength="120" autocomplete="off"></label>
+    <div class="row2">
+      <label class="fld">Datum<input type="date" id="f-date" required></label>
+      <label class="chk" style="align-self:end;padding-bottom:9px"><input type="checkbox" id="f-all"> Hele dag</label>
+    </div>
+    <div class="row2" id="timeRow">
+      <label class="fld">Van<input type="time" id="f-start" value="09:00"></label>
+      <label class="fld">Tot<input type="time" id="f-end" value="10:00"></label>
+    </div>
+    <div class="fld">Kleur
+      <div class="swatches" role="radiogroup" aria-label="Kleur" id="swatches">
+        <button type="button" class="sw c-blauw" role="radio" data-c="blauw" aria-label="Blauw"></button>
+        <button type="button" class="sw c-groen" role="radio" data-c="groen" aria-label="Groen"></button>
+        <button type="button" class="sw c-oranje" role="radio" data-c="oranje" aria-label="Oranje"></button>
+        <button type="button" class="sw c-rood" role="radio" data-c="rood" aria-label="Rood"></button>
+        <button type="button" class="sw c-paars" role="radio" data-c="paars" aria-label="Paars"></button>
+      </div>
+    </div>
+    <div class="acts">
+      <button type="button" class="btn del" id="f-del">Verwijderen</button>
+      <button type="button" class="btn" id="f-cancel">Annuleren</button>
+      <button type="submit" class="btn primary">Opslaan</button>
+    </div>
+  </form>
+</div>
+
+<script>
+(function(){
+"use strict";
+var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
+var $=function(s){return document.querySelector(s)};
+var pad=function(n){return String(n).padStart(2,"0")};
+var ymd=function(d){return d.getFullYear()+"-"+pad(d.getMonth()+1)+"-"+pad(d.getDate())};
+var parse=function(s){var p=s.split("-").map(Number);return new Date(p[0],p[1]-1,p[2])};
+var addDays=function(s,n){var d=parse(s);d.setDate(d.getDate()+n);return ymd(d)};
+var mondayOf=function(s){var d=parse(s);d.setDate(d.getDate()-((d.getDay()+6)%7));return ymd(d)};
+var toMin=function(t){var p=(t||"0:0").split(":");return (+p[0])*60+(+p[1]||0)};
+var fromMin=function(m){m=Math.max(0,Math.min(1439,m));return pad(Math.floor(m/60))+":"+pad(m%60)};
+var esc=function(s){return String(s).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+var uid=function(){return Math.random().toString(36).slice(2,10)};
+var fmt=function(o){var f=new Intl.DateTimeFormat("nl-BE",o);return function(s){return f.format(parse(s))}};
+var fMonth=fmt({month:"long",year:"numeric"}), fLong=fmt({weekday:"long",day:"numeric",month:"long",year:"numeric"});
+var fDm=fmt({day:"numeric",month:"short"}), fDmy=fmt({day:"numeric",month:"short",year:"numeric"});
+var fDow=fmt({weekday:"short"}), fSide=fmt({weekday:"long",day:"numeric",month:"long"});
+function isoWeek(s){var d=parse(s);d.setDate(d.getDate()+3-((d.getDay()+6)%7));var w1=new Date(d.getFullYear(),0,4);return 1+Math.round(((d-w1)/864e5-3+((w1.getDay()+6)%7))/7)}
+
+var todayStr=ymd(new Date());
+var ui={view:"week",cursor:todayStr,side:null};
+try{var u=JSON.parse(localStorage.getItem(UIKEY)||"null");if(u){if(u.view)ui.view=u.view;if(typeof u.side==="boolean")ui.side=u.side}}catch(e){}
+if(ui.side===null)ui.side=window.innerWidth>820;
+var h=(location.hash||"").slice(1);if(h==="maand"||h==="week"||h==="dag")ui.view=h;
+function saveUi(){try{localStorage.setItem(UIKEY,JSON.stringify({view:ui.view,side:ui.side}))}catch(e){}}
+
+/* Gegevens */
+function seed(){
+  var t=todayStr;
+  return {
+    events:[
+      {id:uid(),title:"Voorbeeld: ontbijtafspraak",date:t,start:"09:00",end:"10:00",allDay:false,color:"oranje"},
+      {id:uid(),title:"Voorbeeld: project overleg",date:t,start:"13:30",end:"15:00",allDay:false,color:"blauw"},
+      {id:uid(),title:"Voorbeeld: sporten",date:addDays(t,1),start:"18:00",end:"19:00",allDay:false,color:"groen"},
+      {id:uid(),title:"Voorbeeld: tandarts",date:addDays(t,3),start:"11:00",end:"11:45",allDay:false,color:"rood"},
+      {id:uid(),title:"Voorbeeld: weekendje weg",date:addDays(t,6),start:"00:00",end:"23:59",allDay:true,color:"paars"}
+    ],
+    todos:[
+      {id:uid(),text:"Voorbeeld: boodschappen doen",done:false,date:t},
+      {id:uid(),text:"Voorbeeld: e-mails beantwoorden",done:true,date:t},
+      {id:uid(),text:"Voorbeeld: cadeau kopen",done:false,date:null},
+      {id:uid(),text:"Verwijder de voorbeelden als je klaar bent",done:false,date:null}
+    ]
+  };
+}
+var data=null;
+try{data=JSON.parse(localStorage.getItem(KEY)||"null")}catch(e){}
+if(!data||!Array.isArray(data.events)||!Array.isArray(data.todos))data=seed();
+var store=null,timer=null;
+function save(){
+  try{localStorage.setItem(KEY,JSON.stringify(data))}catch(e){}
+  if(store){clearTimeout(timer);timer=setTimeout(function(){try{Promise.resolve(store.set(data)).catch(function(){})}catch(e){}},500)}
+}
+
+/* Afspraken die ik voor je toevoeg; elk komt maar één keer in je agenda */
+var PRESETS=[
+  {id:"p-babyborrel-20261121",title:"Baby borrel L & B",date:"2026-11-21",start:"15:00",end:"17:00",allDay:false,color:"oranje"}
+];
+data.applied=data.applied||[];
+PRESETS.forEach(function(p){if(data.applied.indexOf(p.id)<0){data.applied.push(p.id);data.events.push(Object.assign({},p))}});
+save();
+
+/* Hulpfuncties */
+function eventsOn(d){
+  return data.events.filter(function(e){return e.date===d}).sort(function(a,b){
+    return (b.allDay?1:0)-(a.allDay?1:0)||toMin(a.start)-toMin(b.start)});
+}
+function timeLabel(e){return e.allDay?"":e.start}
+function evChip(e){
+  return '<button class="ev c-'+esc(e.color)+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+esc(e.title)+"</button>";
+}
+function visibleDays(){
+  if(ui.view==="dag")return [ui.cursor];
+  var m=mondayOf(ui.cursor),a=[];for(var i=0;i<7;i++)a.push(addDays(m,i));return a;
+}
+
+/* Kop */
+function renderHead(){
+  var t,s="";
+  if(ui.view==="maand"){t=fMonth(ui.cursor)}
+  else if(ui.view==="week"){var d=visibleDays();t=fDm(d[0])+" – "+fDmy(d[6]);s="Week "+isoWeek(d[0])}
+  else{t=fLong(ui.cursor);s="Week "+isoWeek(ui.cursor)}
+  $("#title").firstChild.nodeValue=t;
+  $("#subtitle").textContent=s;
+  ["maand","week","dag"].forEach(function(v){$("#tab-"+v).setAttribute("aria-selected",String(ui.view===v))});
+  var open=data.todos.filter(function(x){return !x.done&&x.date===ui.cursor}).length;
+  $("#badge").textContent=open;
+}
+
+/* Maand */
+function renderMonth(){
+  var first=ui.cursor.slice(0,8)+"01";
+  var start=mondayOf(first);
+  var dim=new Date(parse(first).getFullYear(),parse(first).getMonth()+1,0).getDate();
+  var rows=Math.ceil(((parse(first).getDay()+6)%7+dim)/7);
+  var html='<div class="month" style="grid-template-rows:auto repeat('+rows+',minmax(0,1fr))">';
+  ["ma","di","wo","do","vr","za","zo"].forEach(function(n){html+='<div class="dow">'+n+"</div>"});
+  var curMonth=ui.cursor.slice(0,7);
+  for(var i=0;i<rows*7;i++){
+    var d=addDays(start,i),evs=eventsOn(d);
+    var cls="cell"+(d.slice(0,7)!==curMonth?" other":"")+(d===todayStr?" today":"")+(d===ui.cursor?" sel":"");
+    html+='<div class="'+cls+'" data-day="'+d+'"><button class="dnum" data-goday="'+d+'" aria-label="'+fLong(d)+'">'+parse(d).getDate()+"</button>";
+    evs.slice(0,3).forEach(function(e){html+=evChip(e)});
+    if(evs.length>3)html+='<button class="more" data-goday="'+d+'">+'+(evs.length-3)+" meer</button>";
+    html+="</div>";
+  }
+  $("#scroller").innerHTML=html+"</div>";
+}
+
+/* Week / dag */
+function pack(list){
+  list.sort(function(a,b){return a.s-b.s||b.t-a.t});
+  var out=[],cl=[],end=-1;
+  function flush(){var cols=[];cl.forEach(function(it){var c=cols.findIndex(function(x){return x<=it.s});if(c<0){c=cols.length;cols.push(0)}cols[c]=it.t;it.col=c});cl.forEach(function(it){it.n=cols.length});out=out.concat(cl);cl=[]}
+  list.forEach(function(it){if(cl.length&&it.s>=end){flush();end=-1}cl.push(it);end=Math.max(end,it.t)});
+  if(cl.length)flush();return out;
+}
+function renderGrid(){
+  var days=visibleDays(),n=days.length,sc=$("#scroller"),prev=sc.scrollTop;
+  var first=!sc.querySelector(".gridrow");
+  var oldHour=HOUR;
+  HOUR=Math.max(34,Math.min(72,Math.round((sc.clientHeight-80)/12)));
+  prev=prev*HOUR/oldHour;
+  var html='<div class="sticky"><div class="gridrow" style="--n:'+n+'"><div></div>';
+  days.forEach(function(d){
+    html+='<button class="dayhead'+(d===todayStr?" today":"")+(d===ui.cursor?" sel":"")+'" data-pick="'+d+'"><span class="dw">'+fDow(d)+'</span><span class="dn">'+parse(d).getDate()+"</span></button>";
+  });
+  html+='</div><div class="gridrow alldayrow" style="--n:'+n+'"><div class="gl">hele dag</div>';
+  days.forEach(function(d){
+    html+='<div class="ac" data-new-all="'+d+'">'+eventsOn(d).filter(function(e){return e.allDay}).map(evChip).join("")+"</div>";
+  });
+  html+="</div></div>";
+  html+='<div class="gridrow gridbody" style="--n:'+n+';--hour:'+HOUR+'px"><div class="gutter" style="height:'+(24*HOUR)+'px">';
+  for(var hr=1;hr<24;hr++)html+='<div class="hl" style="top:'+(hr*HOUR)+'px">'+pad(hr)+":00</div>";
+  html+="</div>";
+  var nowMin=new Date().getHours()*60+new Date().getMinutes();
+  days.forEach(function(d){
+    var items=eventsOn(d).filter(function(e){return !e.allDay}).map(function(e){
+      var s=toMin(e.start),t=Math.max(toMin(e.end),s+30);return {e:e,s:s,t:t}});
+    html+='<div class="col'+(d===todayStr?" today":"")+'" data-col="'+d+'" style="height:'+(24*HOUR)+'px">';
+    pack(items).forEach(function(it){
+      var top=it.s/60*HOUR,hgt=Math.max((it.t-it.s)/60*HOUR-2,20),w=100/it.n;
+      html+='<button class="ev c-'+esc(it.e.color)+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+esc(it.e.title)+"</button>";
+    });
+    if(d===todayStr)html+='<div class="now" style="top:'+(nowMin/60*HOUR)+'px"></div>';
+    html+="</div>";
+  });
+  html+="</div>";
+  sc.innerHTML=html;
+  sc.scrollTop=first?7*HOUR:prev;
+}
+
+function renderCal(){ui.view==="maand"?renderMonth():renderGrid()}
+
+/* To-do's */
+function todoItem(x){
+  return '<div class="todo'+(x.done?" done":"")+'"><input type="checkbox" id="t-'+x.id+'" data-todo="'+x.id+'"'+(x.done?" checked":"")+'><label for="t-'+x.id+'">'+esc(x.text)+'</label><button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>';
+}
+function renderTodos(){
+  var day=data.todos.filter(function(x){return x.date===ui.cursor});
+  var gen=data.todos.filter(function(x){return !x.date});
+  var dd=day.filter(function(x){return x.done}).length, gd=gen.filter(function(x){return x.done}).length;
+  var label=ui.cursor===todayStr?"Vandaag":fSide(ui.cursor);
+  var html='<div class="sec"><h3><span>'+esc(label)+"</span><em>"+dd+"/"+day.length+' klaar</em></h3>'+
+    (day.length?day.map(todoItem).join(""):'<div class="empty">Niets gepland voor deze dag.</div>')+
+    '<form class="add" data-add="day"><input type="text" id="add-day" placeholder="Taak voor deze dag" maxlength="140" aria-label="Taak voor deze dag" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
+  html+='<div class="sec"><h3><span>Algemeen</span><em>'+gd+"/"+gen.length+' klaar</em></h3>'+
+    (gen.length?gen.map(todoItem).join(""):'<div class="empty">Nog geen algemene taken.</div>')+
+    '<form class="add" data-add="gen"><input type="text" id="add-gen" placeholder="Algemene taak" maxlength="140" aria-label="Algemene taak" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
+  var any=data.todos.some(function(x){return x.done});
+  if(any)html+='<div class="sec"><button class="linkbtn" data-clear>Wis alle afgevinkte taken</button></div>';
+  var keep=document.activeElement&&document.activeElement.id,val=keep&&document.activeElement.value;
+  $("#todos").innerHTML=html;
+  if(keep&&/^add-/.test(keep)){var el=document.getElementById(keep);if(el){el.value=val;el.focus()}}
+}
+function applySide(){
+  $("#side").setAttribute("data-open",String(ui.side));
+  $("#side").setAttribute("aria-hidden",String(!ui.side));
+  if("inert" in $("#side"))$("#side").inert=!ui.side;
+  $("#toggleSide").setAttribute("aria-expanded",String(ui.side));
+}
+
+function renderAll(){renderHead();renderCal();renderTodos();applySide()}
+
+/* Navigatie */
+function shift(dir){
+  if(ui.view==="maand"){var d=parse(ui.cursor);d.setDate(1);d.setMonth(d.getMonth()+dir);ui.cursor=ymd(d)}
+  else if(ui.view==="week")ui.cursor=addDays(ui.cursor,7*dir);
+  else ui.cursor=addDays(ui.cursor,dir);
+  renderAll();
+}
+function setView(v,d){ui.view=v;if(d)ui.cursor=d;saveUi();try{history.replaceState(null,"","#"+v)}catch(e){try{location.hash=v}catch(_){}}renderAll()}
+
+/* Dialoog */
+var editing=null,color="blauw";
+function setColor(c){color=c;document.querySelectorAll(".sw").forEach(function(b){b.setAttribute("aria-checked",String(b.dataset.c===c))})}
+function syncAll(){$("#timeRow").style.display=$("#f-all").checked?"none":"grid"}
+function openDlg(e,def){
+  editing=e||null;
+  $("#dlgTitle").textContent=e?"Afspraak bewerken":"Nieuwe afspraak";
+  var v=e||def||{};
+  $("#f-title").value=e?e.title:"";
+  $("#f-date").value=v.date||ui.cursor;
+  $("#f-all").checked=!!v.allDay;
+  $("#f-start").value=v.start||"09:00";
+  $("#f-end").value=v.end||"10:00";
+  setColor(v.color||"blauw");
+  $("#f-del").style.display=e?"":"none";
+  syncAll();
+  $("#scrim").classList.add("on");
+  setTimeout(function(){$("#f-title").focus()},0);
+}
+function closeDlg(){$("#scrim").classList.remove("on");editing=null}
+$("#form").addEventListener("submit",function(ev){
+  ev.preventDefault();
+  var all=$("#f-all").checked,s=$("#f-start").value||"09:00",t=$("#f-end").value||"10:00";
+  if(!all&&toMin(t)<=toMin(s))t=fromMin(toMin(s)+60);
+  var o={title:$("#f-title").value.trim(),date:$("#f-date").value,allDay:all,start:all?"00:00":s,end:all?"23:59":t,color:color};
+  if(!o.title||!o.date)return;
+  if(editing){Object.assign(editing,o)}else{o.id=uid();data.events.push(o)}
+  save();closeDlg();ui.cursor=o.date;renderAll();
+});
+$("#f-all").addEventListener("change",syncAll);
+$("#f-cancel").addEventListener("click",closeDlg);
+$("#f-del").addEventListener("click",function(){
+  if(editing){data.events=data.events.filter(function(x){return x.id!==editing.id});save();closeDlg();renderAll()}
+});
+$("#swatches").addEventListener("click",function(e){var b=e.target.closest(".sw");if(b)setColor(b.dataset.c)});
+$("#scrim").addEventListener("mousedown",function(e){if(e.target===$("#scrim"))closeDlg()});
+document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("#scrim").classList.contains("on"))closeDlg()});
+
+/* Kalender-interacties */
+$("#scroller").addEventListener("click",function(e){
+  var t=e.target;
+  var ev=t.closest("[data-ev]");
+  if(ev){var f=data.events.find(function(x){return x.id===ev.dataset.ev});if(f)openDlg(f);return}
+  var g=t.closest("[data-goday]");if(g){setView("dag",g.dataset.goday);return}
+  var p=t.closest("[data-pick]");if(p){ui.cursor=p.dataset.pick;if(ui.view==="dag")return;renderAll();return}
+  var col=t.closest("[data-col]");
+  if(col){
+    var r=col.getBoundingClientRect(),m=Math.floor((e.clientY-r.top)/HOUR*2)*30;
+    ui.cursor=col.dataset.col;
+    openDlg(null,{date:col.dataset.col,start:fromMin(m),end:fromMin(m+60),color:"blauw"});return;
+  }
+  var ac=t.closest("[data-new-all]");
+  if(ac){ui.cursor=ac.dataset.newAll;openDlg(null,{date:ac.dataset.newAll,allDay:true,color:"blauw"});return}
+  var cell=t.closest("[data-day]");
+  if(cell){ui.cursor=cell.dataset.day;renderAll()}
+});
+$("#scroller").addEventListener("dblclick",function(e){
+  var cell=e.target.closest(".cell");
+  if(cell&&!e.target.closest("[data-ev]")){ui.cursor=cell.dataset.day;openDlg(null,{date:cell.dataset.day})}
+});
+
+/* To-do-interacties */
+$("#todos").addEventListener("change",function(e){
+  var id=e.target.dataset.todo;if(!id)return;
+  var x=data.todos.find(function(t){return t.id===id});if(x){x.done=e.target.checked;save();renderHead();renderTodos()}
+});
+$("#todos").addEventListener("click",function(e){
+  var d=e.target.closest("[data-deltodo]");
+  if(d){data.todos=data.todos.filter(function(t){return t.id!==d.dataset.deltodo});save();renderHead();renderTodos();return}
+  if(e.target.closest("[data-clear]")){data.todos=data.todos.filter(function(t){return !t.done});save();renderHead();renderTodos()}
+});
+$("#todos").addEventListener("submit",function(e){
+  e.preventDefault();
+  var f=e.target.closest("[data-add]");if(!f)return;
+  var inp=f.querySelector("input"),txt=inp.value.trim();if(!txt)return;
+  data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null});
+  inp.value="";save();renderHead();renderTodos();
+  var again=document.getElementById(f.dataset.add==="day"?"add-day":"add-gen");if(again)again.focus();
+});
+
+/* Kopknoppen */
+$("#prev").addEventListener("click",function(){shift(-1)});
+$("#next").addEventListener("click",function(){shift(1)});
+$("#today").addEventListener("click",function(){ui.cursor=todayStr;renderAll()});
+document.querySelectorAll(".tabs button").forEach(function(b){b.addEventListener("click",function(){setView(b.dataset.view)})});
+$("#newEv").addEventListener("click",function(){openDlg(null,{date:ui.cursor})});
+function toggleSide(){ui.side=!ui.side;saveUi();applySide()}
+$("#toggleSide").addEventListener("click",toggleSide);
+$("#closeSide").addEventListener("click",function(){ui.side=false;saveUi();applySide();$("#toggleSide").focus()});
+window.addEventListener("hashchange",function(){var v=(location.hash||"").slice(1);if((v==="maand"||v==="week"||v==="dag")&&v!==ui.view){ui.view=v;saveUi();renderAll()}});
+
+/* Rode lijn voor het huidige tijdstip bijwerken */
+setInterval(function(){
+  var n=document.querySelector(".now");
+  if(n){var d=new Date();n.style.top=((d.getHours()*60+d.getMinutes())/60*HOUR)+"px"}
+},60000);
+
+renderAll();
+
+/* Opnieuw tekenen als het venster of de kalender van grootte verandert */
+var rt=null,lastW=0,lastH=0;
+function onSize(){
+  var sc=$("#scroller");if(!sc)return;
+  if(sc.clientWidth===lastW&&sc.clientHeight===lastH)return;
+  lastW=sc.clientWidth;lastH=sc.clientHeight;
+  clearTimeout(rt);rt=setTimeout(function(){if(ui.view!=="maand")renderGrid()},80);
+}
+if(window.ResizeObserver){new ResizeObserver(onSize).observe($("#scroller"))}
+window.addEventListener("resize",onSize);
+})();
+</script>
+</body>
+</html>
