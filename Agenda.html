@@ -154,6 +154,13 @@ button{cursor:pointer}
 .status{font-size:12px;color:var(--muted)}
 [hidden]{display:none!important}
 
+/* Voice input */
+.btn.mic{display:inline-flex;align-items:center;justify-content:center;padding:7px 10px}
+.btn.mic svg{width:18px;height:18px;display:block}
+.btn.mic.rec{background:var(--c-red);border-color:var(--c-red);color:#fff;animation:recpulse 1.2s ease-in-out infinite}
+@keyframes recpulse{50%{box-shadow:0 0 0 6px color-mix(in srgb,var(--c-red) 25%,transparent)}}
+@media (prefers-reduced-motion:reduce){.btn.mic.rec{animation:none}}
+
 /* Deadlines and repeating to-dos */
 .ev.dl{--c:var(--c-red);background:transparent;border:1px dashed var(--c);border-left:3px solid var(--c);color:var(--ink)}
 .ev.dl:hover{background:color-mix(in srgb,var(--c) 12%,var(--surface))}
@@ -241,8 +248,11 @@ button{cursor:pointer}
 
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
+    <button class="btn mic" type="button" id="micBtn" hidden aria-label="Spreek je opdracht in" title="Spreek in">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
+    </button>
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" id="ver" style="font-size:11px">versie 15</span>
+    <span class="hint" id="ver" style="font-size:11px">versie 16</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -318,7 +328,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=15; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=16; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -798,7 +808,7 @@ var UNIT="(?:uur|u|h|:)(?![a-zA-Z])";
 var RE_RANGE=new RegExp("(\\d{1,2})(?:\\s*"+UNIT+"\\s*(\\d{2})?)?\\s*(?:-|–|tot)\\s*(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
 var RE_TIME=new RegExp("(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
 var DAYWORD="(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|werkdagen|werkdag|weekenddagen|weekend|dagen|dag|ma|di|wo|do|vr|za|zo)";
-var DAYSEP="\\s*(?:,\\s*en|,|en|&|/|\\+|of)\\s*";
+var DAYSEP="(?:\\s*(?:,\\s*en|,|en|&|/|\\+|of)\\s*|\\s+)";
 var RE_EVERY=new RegExp("\\b(?:elke|iedere|ieder|alle)\\s+("+DAYWORD+"(?:"+DAYSEP+DAYWORD+")*)\\b","i");
 var MON=Object.keys(MONTHS).join("|");
 var COLOR_WORDS={blauw:"blue",blauwe:"blue",groen:"green",groene:"green",oranje:"orange",rood:"red",rode:"red",paars:"purple",paarse:"purple",zwart:"black",zwarte:"black"};
@@ -1165,6 +1175,98 @@ $("#quickForm").addEventListener("submit",function(e){
   }
   inp.value="";save();renderAll();
 });
+
+/* Voice input (Chrome on Android/desktop): speak a sentence; it appears in the bar for you to check before adding.
+   Spoken Dutch is converted to what the sentence parser understands: "half drie" -> 14:30, "kwart over negen" -> 09:15,
+   "acht uur vijftig" -> 08:50, "'s avonds" -> pm, number words before months ("drieëntwintig november"). */
+var NUMW={nul:0,een:1,twee:2,drie:3,vier:4,vijf:5,zes:6,zeven:7,acht:8,negen:9,tien:10,elf:11,twaalf:12,dertien:13,veertien:14,
+  vijftien:15,zestien:16,zeventien:17,achttien:18,negentien:19,twintig:20,dertig:30,veertig:40,vijftig:50};
+function wordNum(w){
+  w=w.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"");
+  if(Object.prototype.hasOwnProperty.call(NUMW,w))return NUMW[w];
+  var m=w.match(/^(een|twee|drie|vier|vijf|zes|zeven|acht|negen)en(twintig|dertig|veertig|vijftig)$/);
+  return m?NUMW[m[2]]+NUMW[m[1]]:null;
+}
+function toNum(w){return /^\d+$/.test(w)?+w:wordNum(w)}
+function normalizeSpeech(text){
+  var s=" "+text.replace(/\s+/g," ").trim()+" ",pm=false,am=false;
+  s=s.replace(/(?:['’]s|\bs)\s+(middags|avonds|ochtends|morgens|nachts)\b/gi,function(_,w){
+    w=w.toLowerCase();if(w==="middags"||w==="avonds")pm=true;else am=true;return " ";
+  });
+  /* clock time from an hour (1-24) and minutes; without "'s avonds"/"'s ochtends" the hours 1-6 are taken as afternoon */
+  function clock(h,m){
+    if(h<=12){
+      if(pm){if(h<12)h+=12}
+      else if(am){if(h===12)h=0}
+      else if(h>=1&&h<=6)h+=12;
+    }
+    return pad(h%24)+":"+pad(m);
+  }
+  var W="[a-zA-ZéëïÉËÏ]+",MONRE="(?:"+MON+")";
+  s=s.replace(new RegExp("\\bhalf\\s+("+W+"|\\d{1,2})(?:\\s+uur)?\\b","gi"),function(all,w){
+    var n=toNum(w);return (n===null||n<1||n>12)?all:" "+clock(n===1?12:n-1,30)+" ";
+  });
+  s=s.replace(new RegExp("\\bkwart\\s+over\\s+("+W+"|\\d{1,2})(?:\\s+uur)?\\b","gi"),function(all,w){
+    var n=toNum(w);return (n===null||n<1||n>12)?all:" "+clock(n,15)+" ";
+  });
+  s=s.replace(new RegExp("\\bkwart\\s+voor\\s+("+W+"|\\d{1,2})(?:\\s+uur)?\\b","gi"),function(all,w){
+    var n=toNum(w);return (n===null||n<1||n>12)?all:" "+clock(n===1?12:n-1,45)+" ";
+  });
+  s=s.replace(/\b(om|van|tot|vanaf|rond)\s+(?:een|\u00e9\u00e9n)\s+uur\b/gi,"$1 1 uur");   /* "een uur" = 1 o'clock only after a time word */
+  s=s.replace(new RegExp("\\b("+W+")\\s+uur\\b","gi"),function(all,w){
+    var n=/^(een|\u00e9\u00e9n)$/i.test(w)?null:wordNum(w);return n===null?all:" "+n+" uur";
+  });
+  s=s.replace(new RegExp("\\buur\\s+("+W+")\\b","gi"),function(all,w){
+    var n=/^een$|^één$/i.test(w)?null:wordNum(w);return (n===null||n>59)?all:"uur "+n;
+  });
+  s=s.replace(new RegExp("\\b("+W+")\\s+("+MONRE+")\\b","gi"),function(all,w,mo){
+    var n=wordNum(w);return (n===null||n<1||n>31)?all:n+" "+mo;
+  });
+  s=s.replace(/\b(om|van|tot|vanaf|rond)\s+(\d{1,2})\.(\d{2})\b/gi,function(all,pre,h,m){
+    return (+h>23||+m>59)?all:pre+" "+clock(+h,+m);
+  });
+  s=s.replace(new RegExp("\\b(\\d{1,2})\\s*uur(?:\\s+(\\d{1,2})(?!\\s*"+MONRE+"\\b)\\b)?","gi"),function(all,h,m){
+    h=+h;m=m?+m:0;return (h>24||m>59)?all:clock(h,m);
+  });
+  return s.replace(/\s+/g," ").trim();
+}
+(function(){
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition,btn=$("#micBtn");
+  if(!SR||!btn)return;
+  btn.hidden=false;
+  var rec=null,listening=false;
+  var ERRORS={
+    "not-allowed":"Geen toegang tot de microfoon. Sta de microfoon toe in de instellingen van je browser.",
+    "service-not-allowed":"Spraakherkenning is niet toegestaan in deze browser.",
+    "no-speech":"Ik hoorde niets. Tik op de microfoon en probeer het opnieuw.",
+    "network":"Spraakherkenning heeft internet nodig.",
+    "audio-capture":"Ik vond geen microfoon."
+  };
+  btn.addEventListener("click",function(){
+    if(listening){rec.stop();return}
+    var inp=$("#quickInput"),msg=$("#quickMsg");
+    rec=new SR();rec.lang="nl-BE";rec.interimResults=true;rec.continuous=false;rec.maxAlternatives=1;
+    rec.onstart=function(){
+      listening=true;btn.classList.add("rec");btn.setAttribute("aria-pressed","true");
+      msg.classList.remove("err");msg.textContent="Ik luister… spreek je zin uit.";
+    };
+    rec.onresult=function(e){
+      var raw=Array.prototype.map.call(e.results,function(r){return r[0].transcript}).join(" ").trim();
+      var last=e.results[e.results.length-1];
+      if(last.isFinal){
+        inp.value=normalizeSpeech(raw);
+        msg.classList.remove("err");
+        msg.textContent="Gehoord: “"+raw+"”. Controleer de zin in de balk en tik op Toevoegen.";
+      }else inp.value=raw;
+    };
+    rec.onerror=function(e){
+      if(e.error==="aborted")return;
+      msg.classList.add("err");msg.textContent=ERRORS[e.error]||"Spraakherkenning mislukt ("+e.error+").";
+    };
+    rec.onend=function(){listening=false;btn.classList.remove("rec");btn.setAttribute("aria-pressed","false")};
+    try{rec.start()}catch(err){}
+  });
+})();
 
 /* Header buttons */
 $("#prev").addEventListener("click",function(){shift(-1)});
