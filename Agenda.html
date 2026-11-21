@@ -305,7 +305,7 @@ var COLOR_MIGRATE={blauw:"blue",groen:"green",oranje:"orange",rood:"red",paars:"
 data.events.forEach(function(e){if(COLOR_MIGRATE[e.color])e.color=COLOR_MIGRATE[e.color]});
 
 /* Cloud sync (Supabase). Leave URL or key empty to keep everything on this device only. */
-var SUPABASE_URL="";
+var SUPABASE_URL="https://xvuqcmmxarvkpcetztno.supabase.co";
 var SUPABASE_KEY="sb_publishable_OSzi_SMjJuKx9nDrA7UIfA_telqAWBY";
 var DIRTYKEY="agenda-dirty-v1", SYNCEDKEY="agenda-synced-user-v1";
 var sync={client:null,user:null,busy:false,timer:null,ver:0};
