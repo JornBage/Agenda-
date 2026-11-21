@@ -1,0 +1,17 @@
+{
+  "name": "Mijn Agenda",
+  "short_name": "Agenda",
+  "description": "Persoonlijke agenda met afspraken en to-do's",
+  "lang": "nl",
+  "start_url": "./Agenda.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#f3f5f7",
+  "theme_color": "#17727c",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
