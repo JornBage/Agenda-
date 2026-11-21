@@ -154,6 +154,17 @@ button{cursor:pointer}
 .status{font-size:12px;color:var(--muted)}
 [hidden]{display:none!important}
 
+/* Day overview under the calendar (narrow screens, month and week view) */
+.dayinfo{display:none;flex:none;max-height:44%;overflow:auto;border-top:1px solid var(--line);background:var(--surface);padding:8px 12px 10px}
+@container (max-width:720px){.dayinfo.on{display:block}.month .cell .ev,.month .cell .more,.month .cell .dnum{pointer-events:none}}  /* any tap on a day selects it; open appointments or the day view from the overview below */
+.dayinfo h3{margin:0 0 6px;font:700 14px var(--f-display);display:flex;justify-content:space-between;align-items:baseline;gap:8px;text-transform:capitalize}
+.dayinfo h3 small{font:500 12px var(--f-body);color:var(--muted);text-transform:none}
+.dayev{--c:var(--c-blue);display:flex;gap:10px;align-items:baseline;width:100%;text-align:left;border:0;border-left:4px solid var(--c);background:color-mix(in srgb,var(--c) 14%,var(--surface));border-radius:6px;padding:7px 9px;margin-bottom:5px;font-size:14px;color:var(--ink)}
+.dayev .t{font-weight:700;flex:none;min-width:6.2em;font-variant-numeric:tabular-nums}
+.dayev .n{min-width:0;word-break:break-word}
+.dayev.c-black{background:var(--c-black);color:var(--surface)}
+.dayact{display:flex;gap:8px;margin-top:6px}
+
 /* Weekday picker for repeating events */
 .days{display:flex;gap:6px;flex-wrap:wrap}
 .day{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--line);border-radius:999px;padding:4px 10px;font-weight:600;color:var(--ink);cursor:pointer;background:var(--bg)}
@@ -220,12 +231,12 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" id="ver" style="font-size:11px">versie 13</span>
+    <span class="hint" id="ver" style="font-size:11px">versie 14</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
   <div class="main">
-    <section class="cal"><div class="scroller" id="scroller"></div></section>
+    <section class="cal"><div class="scroller" id="scroller"></div><div class="dayinfo" id="dayinfo" aria-live="polite"></div></section>
     <aside class="side" id="side" data-open="true" aria-label="To-do-lijst">
       <div class="side-in">
         <div class="side-head">
@@ -296,7 +307,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=13; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=14; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -601,7 +612,20 @@ function applySide(){
   $("#toggleSide").setAttribute("aria-expanded",String(ui.side));
 }
 
-function renderAll(){renderHead();renderCal();renderTodos();applySide()}
+/* Readable list of the selected day, shown under the calendar on narrow screens */
+function renderDayInfo(){
+  var el=$("#dayinfo");
+  if(ui.view==="day"){el.classList.remove("on");el.innerHTML="";return}
+  var evs=eventsOn(ui.cursor);
+  var html='<h3><span>'+esc(fLong(ui.cursor))+'</span><small>'+(evs.length?evs.length+(evs.length>1?" afspraken":" afspraak"):"")+'</small></h3>';
+  if(!evs.length)html+='<div class="empty">Geen afspraken op deze dag.</div>';
+  evs.forEach(function(e){
+    html+='<button class="dayev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'"><span class="t">'+(e.allDay?"hele dag":e.start+"\u2013"+e.end)+'</span><span class="n">'+(e.repeat?"\u21bb ":"")+esc(e.title)+"</span></button>";
+  });
+  html+='<div class="dayact"><button class="btn" data-newday>+ Afspraak</button><button class="btn" data-goday="'+ui.cursor+'">Dagweergave</button></div>';
+  el.innerHTML=html;el.classList.add("on");
+}
+function renderAll(){renderHead();renderDayInfo();renderCal();renderTodos();applySide()}
 
 /* Navigation */
 function shift(dir){
@@ -684,6 +708,13 @@ $("#scroller").addEventListener("click",function(e){
 $("#scroller").addEventListener("dblclick",function(e){
   var cell=e.target.closest(".cell");
   if(cell&&!e.target.closest("[data-ev]")){ui.cursor=cell.dataset.day;openDlg(null,{date:cell.dataset.day})}
+});
+
+$("#dayinfo").addEventListener("click",function(e){
+  var ev=e.target.closest("[data-ev]");
+  if(ev){var f=data.events.find(function(x){return x.id===ev.dataset.ev});if(f)openDlg(f);return}
+  if(e.target.closest("[data-newday]")){openDlg(null,{date:ui.cursor});return}
+  var g=e.target.closest("[data-goday]");if(g)setView("day",g.dataset.goday);
 });
 
 /* To-do interactions */
