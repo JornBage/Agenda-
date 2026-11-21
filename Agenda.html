@@ -213,7 +213,7 @@ button{cursor:pointer}
   <form class="quick" id="quickForm" autocomplete="off">
     <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
     <button class="btn primary" type="submit">Toevoegen</button>
-    <span class="hint" style="font-size:11px">versie 10</span>
+    <span class="hint" id="ver" style="font-size:11px">versie 11</span>
     <span class="status" id="quickMsg" role="status"></span>
   </form>
 
@@ -289,6 +289,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
+var APP_VERSION=11; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -987,6 +988,24 @@ setInterval(function(){
 
 renderAll();
 initCloud();
+$("#ver").textContent="versie "+APP_VERSION;
+
+/* Auto-update: when served over http(s), look for a newer version of this page (bypassing the browser cache)
+   and load it, unless the user is typing or a dialog is open. */
+function checkUpdate(){
+  if(!/^https?:$/.test(location.protocol)||!window.fetch)return;
+  var base=location.origin+location.pathname;
+  fetch(base+"?check="+Date.now(),{cache:"no-store"}).then(function(r){return r.ok?r.text():""}).then(function(t){
+    var m=t.match(/APP_VERSION=(\d+);/);
+    if(!m||+m[1]<=APP_VERSION)return;
+    if($("#scrim").classList.contains("on")||$("#loginScrim").classList.contains("on")||$("#quickInput").value)return;
+    try{if(sessionStorage.getItem("agenda-updated-to")===m[1])return;sessionStorage.setItem("agenda-updated-to",m[1])}catch(e){}
+    location.replace(base+"?v="+m[1]);
+  }).catch(function(){});
+}
+setTimeout(checkUpdate,3000);
+setInterval(checkUpdate,300000);
+document.addEventListener("visibilitychange",function(){if(!document.hidden)checkUpdate()});
 
 /* Redraw when the window or calendar changes size */
 var rt=null,lastW=0,lastH=0;
