@@ -132,6 +132,14 @@ button{cursor:pointer}
 .todo:hover .x,.todo .x:focus-visible{visibility:visible}
 @media (hover:none){.todo .x{visibility:visible}}
 .todo .x:hover{color:var(--c-red)}
+.todo .star{border:0;background:transparent;color:var(--muted);font-size:17px;line-height:1;padding:0 2px;cursor:pointer}
+.todo .star.on{color:var(--c-orange)}
+.todo .plan{display:inline-flex;gap:4px;margin-left:6px;vertical-align:1px}
+.todo .pl{border:1px solid var(--line);background:transparent;color:var(--muted);font-size:11px;font-weight:600;border-radius:999px;padding:1px 7px;cursor:pointer}
+.todo .pl.on{border-color:var(--c-green);color:var(--c-green)}
+.todo .pick{border:1px solid var(--line);background:var(--bg);color:var(--ink);border-radius:6px;width:20px;height:20px;line-height:1;padding:0;cursor:pointer;font-weight:700}
+.todo.avail label{color:var(--muted)}
+.add select{border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:6px;color:inherit;font:inherit;font-size:13px}
 .add{display:flex;gap:6px;margin-top:6px}
 .add input{flex:1;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:7px 10px}
 .empty{color:var(--muted);font-size:13px;padding:4px}
@@ -328,7 +336,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=16; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=18; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -609,7 +617,14 @@ function renderCal(){ui.view==="month"?renderMonth():renderGrid()}
 /* A to-do can repeat (daily or on chosen weekdays, with a check per day) and/or have a deadline shown in the calendar */
 function todoOccursOn(t,d){
   if(!t.repeat)return t.date===d;
+  if(t.repeat.manual)return (t.planDates||[]).indexOf(d)>=0;
+  if((t.skipDates||[]).indexOf(d)>=0)return false;
+  return onSchedule(t,d);
+}
+/* scheduled goal: would occur on d if not skipped */
+function onSchedule(t,d){
   if(d<t.date||(t.repeat.until&&d>t.repeat.until))return false;
+  if(t.repeat.every>1)return Math.round((parse(d)-parse(t.date))/864e5)%t.repeat.every===0;
   return t.repeat.days.indexOf(parse(d).getDay())>=0;
 }
 function todosForDay(d){return data.todos.filter(function(t){return todoOccursOn(t,d)})}
@@ -618,6 +633,10 @@ function setDone(t,d,v){
   if(t.repeat){t.doneDates=(t.doneDates||[]).filter(function(x){return x!==d});if(v)t.doneDates.push(d)}
   else t.done=v;
 }
+function isFocus(t,d){return (t.focusDates||[]).indexOf(d)>=0}
+function toggleFocus(t,d){var f=(t.focusDates||[]).filter(function(x){return x!==d});if(!isFocus(t,d))f.push(d);t.focusDates=f}
+function toggleSkip(t,d){var k=(t.skipDates||[]).filter(function(x){return x!==d});if(k.length===(t.skipDates||[]).length)k.push(d);t.skipDates=k}
+function togglePlan(t,d){var p=(t.planDates||[]).filter(function(x){return x!==d});if(p.length===(t.planDates||[]).length)p.push(d);t.planDates=p}
 function deadlinesOn(d){return data.todos.filter(function(t){return t.deadline===d})}
 function dlChip(t){
   return '<button class="ev dl'+(t.done?" done":"")+'" data-dltodo="'+t.id+'" title="Deadline: '+esc(t.text)+' (klik om af te vinken)">'+(t.done?"✓ ":"⚑ ")+esc(t.text)+"</button>";
@@ -628,15 +647,18 @@ function toggleDeadline(id){
 }
 function todoItem(x){
   var done=isDone(x,ui.cursor),badge="";
-  if(x.repeat)badge+='<span class="dlb">↻ '+(x.repeat.days.length===7?"elke dag":repeatLabel(x.repeat).replace("elke ",""))+"</span>";
+  if(x.repeat)badge+='<span class="dlb">↻ '+(x.repeat.manual?"zelf kiezen":x.repeat.every===2?"om de 2 dagen":x.repeat.days.length===7?"elke dag":x.repeat.days.length===1?"wekelijks, "+repeatLabel(x.repeat).replace("elke ",""):repeatLabel(x.repeat).replace("elke ",""))+"</span>";
   if(x.deadline){
     var cls=!done&&x.deadline<todayStr?" over":(!done&&x.deadline===todayStr?" today":"");
     badge+='<span class="dlb'+cls+'">⚑ '+fDm(x.deadline)+"</span>";
   }
-  return '<div class="todo'+(done?" done":"")+'"><input type="checkbox" id="t-'+x.id+'" data-todo="'+x.id+'"'+(done?" checked":"")+'><label for="t-'+x.id+'">'+esc(x.text)+badge+'</label><button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>';
+  return '<div class="todo'+(done?" done":"")+'"><input type="checkbox" id="t-'+x.id+'" data-todo="'+x.id+'"'+(done?" checked":"")+'><label for="t-'+x.id+'">'+esc(x.text)+badge+(x.repeat&&x.repeat.manual?(function(){var tm=(x.planDates||[]).indexOf(addDays(ui.cursor,1))>=0;
+    return '<span class="plan"><button class="pl'+(tm?" on":"")+'" data-tomorrow="'+x.id+'" aria-pressed="'+tm+'">'+(tm?"\u2713 ook morgen":"+ ook morgen")+'</button><button class="pl" data-unplan="'+x.id+'">niet vandaag</button></span>'})():'')+(x.repeat&&!x.repeat.manual?'<span class="plan"><button class="pl" data-skip="'+x.id+'">niet vandaag</button></span>':'')+'</label>'+(x.repeat?'<button class="star'+(isFocus(x,ui.cursor)?" on":"")+'" data-focus="'+x.id+'" title="Hier wil ik vandaag aan werken" aria-pressed="'+isFocus(x,ui.cursor)+'" aria-label="Focus vandaag: '+esc(x.text)+'">'+(isFocus(x,ui.cursor)?"\u2605":"\u2606")+'</button>':'')+'<button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>';
 }
 function renderTodos(){
-  var day=todosForDay(ui.cursor);
+  var all=todosForDay(ui.cursor),day=all.filter(function(x){return !x.repeat});
+  var goals=all.filter(function(x){return x.repeat}).sort(function(a,b){return isFocus(b,ui.cursor)-isFocus(a,ui.cursor)});
+  var gh=goals.filter(function(x){return isDone(x,ui.cursor)}).length,gf=goals.filter(function(x){return isFocus(x,ui.cursor)}).length;
   var gen=data.todos.filter(function(x){return !x.date&&!x.repeat}).sort(function(a,b){
     return (a.deadline||"9999")<(b.deadline||"9999")?-1:(a.deadline||"9999")>(b.deadline||"9999")?1:0});
   var dd=day.filter(function(x){return isDone(x,ui.cursor)}).length, gd=gen.filter(function(x){return x.done}).length;
@@ -644,6 +666,12 @@ function renderTodos(){
   var html='<div class="sec"><h3><span>'+esc(label)+"</span><em>"+dd+"/"+day.length+' klaar</em></h3>'+
     (day.length?day.map(todoItem).join(""):'<div class="empty">Niets gepland voor deze dag.</div>')+
     '<form class="add" data-add="day"><input type="text" id="add-day" placeholder="Taak voor deze dag" maxlength="140" aria-label="Taak voor deze dag" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
+  html+='<div class="sec"><h3><span>Doelen</span><em>'+gh+"/"+goals.length+" gehaald"+(gf?" \u00b7 \u2605 "+gf:"")+'</em></h3>'+
+    (goals.length?goals.map(todoItem).join(""):'<div class="empty">Geen doelen voor deze dag. Tik \u2606 om te kiezen waar je vandaag aan werkt.</div>')+
+    '<form class="add" data-add="goal"><input type="text" id="add-goal" placeholder="Nieuw doel" maxlength="140" aria-label="Nieuw doel" autocomplete="off"><select id="goal-rep" aria-label="Herhaling"><option value="1">Dagelijks</option><option value="2">Om de 2 dagen</option><option value="7">Wekelijks</option><option value="0">Zelf kiezen</option></select><button class="btn" type="submit">Voeg toe</button></form></div>';
+  var avail=data.todos.filter(function(x){return x.repeat&&(x.repeat.manual?!todoOccursOn(x,ui.cursor)&&!(x.repeat.until&&ui.cursor>x.repeat.until):(x.skipDates||[]).indexOf(ui.cursor)>=0&&onSchedule(x,ui.cursor))});
+  if(avail.length)html+='<div class="sec"><h3><span>Beschikbare doelen</span><em>'+avail.length+'</em></h3>'+avail.map(function(x){
+    return '<div class="todo avail"><button class="pick" data-plan="'+x.id+'" aria-label="Kies voor deze dag: '+esc(x.text)+'">+</button><label>'+esc(x.text)+(x.repeat.manual?'':'<span class="dlb">overgeslagen</span>')+'</label><button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>'}).join("")+'</div>';
   html+='<div class="sec"><h3><span>Algemeen</span><em>'+gd+"/"+gen.length+' klaar</em></h3>'+
     (gen.length?gen.map(todoItem).join(""):'<div class="empty">Nog geen algemene taken.</div>')+
     '<form class="add" data-add="gen"><input type="text" id="add-gen" placeholder="Algemene taak" maxlength="140" aria-label="Algemene taak" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
@@ -776,6 +804,14 @@ $("#todos").addEventListener("change",function(e){
   var x=data.todos.find(function(t){return t.id===id});if(x){setDone(x,ui.cursor,e.target.checked);save();renderAll()}
 });
 $("#todos").addEventListener("click",function(e){
+  var sk=e.target.closest("[data-skip]");
+  if(sk){var st=data.todos.find(function(t){return t.id===sk.dataset.skip});if(st){toggleSkip(st,ui.cursor);save();renderHead();renderTodos()}return}
+  var pl=e.target.closest("[data-tomorrow],[data-unplan],[data-plan]");
+  if(pl){var pid=pl.dataset.tomorrow||pl.dataset.unplan||pl.dataset.plan,pt=data.todos.find(function(t){return t.id===pid});
+    if(pt&&!pt.repeat.manual){toggleSkip(pt,ui.cursor);save();renderHead();renderTodos();return}
+    if(pt){togglePlan(pt,pl.dataset.tomorrow?addDays(ui.cursor,1):ui.cursor);save();renderHead();renderTodos()}return}
+  var fo=e.target.closest("[data-focus]");
+  if(fo){var ft=data.todos.find(function(t){return t.id===fo.dataset.focus});if(ft){toggleFocus(ft,ui.cursor);save();renderTodos()}return}
   var d=e.target.closest("[data-deltodo]");
   if(d){data.todos=data.todos.filter(function(t){return t.id!==d.dataset.deltodo});save();renderAll();return}
   if(e.target.closest("[data-clear]")){data.todos=data.todos.filter(function(t){return t.repeat||!t.done});save();renderAll()}
@@ -784,9 +820,14 @@ $("#todos").addEventListener("submit",function(e){
   e.preventDefault();
   var f=e.target.closest("[data-add]");if(!f)return;
   var inp=f.querySelector("input"),txt=inp.value.trim();if(!txt)return;
-  data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null});
+  if(f.dataset.add==="goal"){
+    var n=+f.querySelector("select").value;
+    data.todos.push({id:uid(),text:txt,done:false,date:ui.cursor,doneDates:[],
+      planDates:n===0?[ui.cursor]:undefined,
+      repeat:n===0?{manual:true,days:[],until:null}:n===7?{days:[parse(ui.cursor).getDay()],until:null}:{days:[0,1,2,3,4,5,6],until:null,every:n>1?n:undefined}});
+  }else data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null});
   inp.value="";save();renderHead();renderTodos();
-  var again=document.getElementById(f.dataset.add==="day"?"add-day":"add-gen");if(again)again.focus();
+  var again=document.getElementById("add-"+f.dataset.add);if(again)again.focus();
 });
 
 /* Quick add: type a sentence such as  voeg 'voetbaltraining' toe op 23 november van 19u30-21u
@@ -893,8 +934,11 @@ function parseQuick(input){
     r.start=a;r.end=fromMin(toMin(a)+60);r.allDay=false;r.hasTime=true;
   }
   /* repeat: "elke maandag, dinsdag en vrijdag", "elke werkdag", "elke dag", "dagelijks" */
-  var days=null,until=null;
-  if((m=take(RE_EVERY)))days=daysFrom(m[1]);
+  var days=null,until=null,every=0,weekly=false;
+  if(take(/\b(?:om\s+de\s+(?:2|twee|andere)\s+dag(?:en)?|elke\s+(?:2|twee)\s+dagen|(?:2|twee)-?dagelijks|tweedaag(?:s|lijks))\b/i)){days=[0,1,2,3,4,5,6];every=2}
+  else if(take(/\b(?:wekelijks|elke\s+week|iedere\s+week)\b/i)){days=[0,1,2,3,4,5,6];weekly=true}
+  else if(take(/\b(?:zelf\s+kiezen|naar\s+keuze|flexibel)\b/i)){days=[0,1,2,3,4,5,6];every=-1}
+  else if((m=take(RE_EVERY)))days=daysFrom(m[1]);
   else if(take(/\bdagelijks\b/i))days=[0,1,2,3,4,5,6];
   /* which part to change/delete: "op 25 november", "van 30 november tot 4 december", "vanaf 14 december", "tot 20 december" (delete),
      and "naar zaterdag" = move (modify) */
@@ -953,8 +997,10 @@ function parseQuick(input){
   if(days&&r.kind==="todo"&&r.deadline)return {error:"Een terugkerende to-do kan geen deadline hebben."};
   r.date=d||((r.kind==="event"||(r.kind==="todo"&&days))?todayStr:null);
   if(days){
+    if(every&&r.kind!=="todo")return {error:(every<0?"'Zelf kiezen'":"'Om de 2 dagen'")+" kan alleen bij to-do's of doelen."};
+    if(weekly)days=[parse(r.date).getDay()];
     if(until&&r.date&&until<r.date)return {error:"De einddatum ligt voor de startdatum."};
-    r.repeat={days:days,until:until};
+    r.repeat=every<0?{manual:true,days:[],until:until}:{days:days,until:until};if(every>0)r.repeat.every=every;
   }
   /* title */
   if(r.kind==="delete"){
@@ -1126,6 +1172,8 @@ function deleteEvents(r){
   return {n:touched,label:selLabel(sel,scope)};
 }
 function repeatLabel(rp){
+  if(rp.manual)return "zelf kiezen";
+  if(rp.every===2)return "om de 2 dagen";
   if(rp.days.length===7)return "elke dag";
   return "elke "+rp.days.slice().sort(function(x,y){return (x+6)%7-(y+6)%7}).map(function(x){return SHORT_DAYS[x]}).join(", ");
 }
@@ -1153,7 +1201,7 @@ $("#quickForm").addEventListener("submit",function(e){
   }else if(r.kind==="todo"){
     var td={id:uid(),text:r.title,done:false,date:r.date};
     if(r.deadline)td.deadline=r.deadline;
-    if(r.repeat){td.repeat=r.repeat;td.doneDates=[]}
+    if(r.repeat){td.repeat=r.repeat;td.doneDates=[];if(r.repeat.manual)td.planDates=[r.date]}
     data.todos.push(td);
     if(r.date)ui.cursor=r.date;else if(r.deadline)ui.cursor=r.deadline;
     msg.textContent="To-do toegevoegd: "+r.title+(r.repeat
