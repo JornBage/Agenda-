@@ -56,3 +56,36 @@ self.addEventListener("fetch", function (e) {
   /* static files (icons, manifest): cache first */
   e.respondWith(caches.match(req).then(function (hit) { return hit || fetch(req); }));
 });
+
+/* Notifications and alarms (sent by the Supabase function "send-reminders") */
+var SB_URL = "https://xvuqcmmxarvkpcetztno.supabase.co", SB_KEY = "sb_publishable_OSzi_SMjJuKx9nDrA7UIfA_telqAWBY";
+self.addEventListener("push", function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: e.data ? e.data.text() : "Agenda" }; }
+  var alarm = d.kind === "alarm";
+  e.waitUntil(self.registration.showNotification((alarm ? "⏰ " : "🔔 ") + (d.title || "Agenda"), {
+    body: (d.body || "") + (alarm && d.n > 1 ? " (herhaling " + d.n + ")" : ""),
+    tag: d.id || "agenda", renotify: true, requireInteraction: alarm,
+    vibrate: alarm ? [800, 300, 800, 300, 800, 300, 800] : [200, 100, 200],
+    icon: "icon-192.png", badge: "icon-192.png",
+    actions: alarm ? [{ action: "stop", title: "Stop alarm" }] : [],
+    data: d
+  }));
+});
+function ack(d) {
+  if (!d || d.kind !== "alarm" || !d.id) return Promise.resolve();
+  return fetch(SB_URL + "/rest/v1/rpc/ack_reminder", {
+    method: "POST", headers: { "Content-Type": "application/json", apikey: SB_KEY },
+    body: JSON.stringify({ p_id: d.id, p_token: d.token })
+  }).catch(function () {});
+}
+self.addEventListener("notificationclose", function (e) { e.waitUntil(ack(e.notification.data)); });
+self.addEventListener("notificationclick", function (e) {
+  e.notification.close();
+  var jobs = [ack(e.notification.data)];
+  if (e.action !== "stop") jobs.push(self.clients.matchAll({ type: "window", includeUncontrolled: true }).then(function (cs) {
+    for (var i = 0; i < cs.length; i++) if ("focus" in cs[i]) return cs[i].focus();
+    return self.clients.openWindow("./Agenda.html");
+  }));
+  e.waitUntil(Promise.all(jobs));
+});
