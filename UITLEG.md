@@ -136,21 +136,23 @@ De werkwijze veranderde: er werden geen pull requests meer gemaakt. Ik werkte ve
 ## Deel 3 — Hoe alles samenwerkt
 
 ```
- Jouw telefoon / computer                 GitHub                        Supabase
- ┌───────────────────────┐        ┌──────────────────────┐      ┌───────────────────────────┐
- │ Browser of             │◀──────│ GitHub Pages          │      │ Inloggen (Auth)           │
- │ geïnstalleerde app     │ laadt │ zet Agenda.html,      │      │                           │
- │                        │ de app│ sw.js, icoontjes      │      │ Tabel agenda_data         │
- │ localStorage:          │       │ online                │      │  (je hele agenda)         │
- │  eigen kopie agenda    │◀─────────────────────────────────────▶│                           │
- │                        │  synchroniseren na inloggen  │      │ Tabel reminders           │
- │ sw.js (service worker) │       └──────────────────────┘      │ Tabel push_subs           │
- │  offline + meldingen   │                                     │                           │
- │                        │◀────────── Web Push ─────────────────│ Edge Function             │
- └───────────────────────┘                                     │  send-reminders           │
-                                                               │  ▲ elke minuut aangeroepen│
-                                                               │  │ door pg_cron            │
-                                                               └───────────────────────────┘
+ GITHUB PAGES  (zet de app online)
+      │
+      │ 1. je browser laadt Agenda.html, sw.js, icoontjes
+      ▼
+ JOUW TELEFOON / COMPUTER
+   • browser of geïnstalleerde app
+   • localStorage: eigen kopie van je agenda
+   • sw.js: offline werken + meldingen tonen
+      │                              ▲
+      │ 2. synchroniseren            │ 3. Web Push-melding
+      │    na inloggen               │
+      ▼                              │
+ SUPABASE
+   • Auth: inloggen
+   • tabel agenda_data: je hele agenda
+   • tabellen reminders + push_subs
+   • pg_cron ──elke minuut──▶ Edge Function send-reminders
 ```
 
 1. **De app openen**: je browser haalt `Agenda.html` op van **GitHub Pages**.

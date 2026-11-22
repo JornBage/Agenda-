@@ -1,0 +1,516 @@
+<!DOCTYPE html><html lang="nl"><head><meta charset="utf-8"><title>Uitleg Mijn Agenda</title><style>
+body{font-family:'DejaVu Sans',Arial,sans-serif;max-width:900px;margin:30px auto;padding:0 20px;line-height:1.5;color:#222;font-size:14px}
+h1{color:#17727c;border-bottom:3px solid #17727c;padding-bottom:6px}
+h2{color:#17727c;margin-top:36px;border-bottom:1px solid #ccc;padding-bottom:4px}
+h3{color:#333;margin-top:24px}
+table{border-collapse:collapse;width:100%;margin:12px 0;font-size:13px}
+th,td{border:1px solid #ccc;padding:6px 8px;vertical-align:top;text-align:left}
+th{background:#e6f2f3}
+tr:nth-child(even) td{background:#fafafa}
+code{background:#f0f0f0;padding:1px 4px;border-radius:3px;font-family:'DejaVu Sans Mono',monospace;font-size:12px}
+pre{background:#f6f8fa;border:1px solid #ddd;padding:10px;overflow-x:auto;font-size:12px;line-height:1.3}
+pre code{background:none;padding:0}
+blockquote{border-left:4px solid #17727c;background:#eef6f7;margin:12px 0;padding:8px 14px}
+tr,pre,blockquote{page-break-inside:avoid}
+</style></head><body><h1>Hoe je agenda-app tot stand kwam: de volledige uitleg</h1>
+<p><em>Opgesteld op 22 november 2026. Alle tijden zijn Belgische/Nederlandse tijd.</em></p>
+<blockquote>
+<p><strong>Hoe dit document gemaakt is.</strong> Na <code>/clear</code> zie ik ons eerdere gesprek niet meer. Ik heb alles
+gereconstrueerd uit wat wel bewaard is: de volledige geschiedenis op GitHub (elke commit, branch en
+pull request, met tijdstip), de bestanden zelf en de installatie-instructies voor Supabase.
+Wat <strong>zeker</strong> is, staat gewoon vermeld. Wat ik <strong>afleid</strong>, bijvoorbeeld handelingen die jij zelf in
+Supabase of op GitHub deed, staat aangegeven met <em>(afgeleid)</em>.</p>
+</blockquote>
+<hr />
+<h2>Deel 1 — Begrippen</h2>
+<p>Eerst de woorden die steeds terugkomen.</p>
+<table>
+<thead>
+<tr>
+<th>Begrip</th>
+<th>Wat het is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Claude Code (cloud)</strong></td>
+<td>De versie van Claude waarmee je nu praat. Ik draai in een tijdelijke computer in de cloud (een "container"). Daarin staat een kopie van je project en ik kan er bestanden aanmaken, aanpassen en naar GitHub sturen. De container wordt na een tijd opgeruimd, dus alles wat bewaard moet blijven, moet naar GitHub.</td>
+</tr>
+<tr>
+<td><strong>GitHub</strong></td>
+<td>Een website waar code bewaard wordt, met de volledige geschiedenis van elke wijziging.</td>
+</tr>
+<tr>
+<td><strong>Repository (repo)</strong></td>
+<td>Een projectmap op GitHub. Die van jou heet <strong><code>JornBage/claude-bestanden</code></strong> en is <strong>openbaar</strong> (iedereen kan de code bekijken).</td>
+</tr>
+<tr>
+<td><strong>Commit</strong></td>
+<td>Een opgeslagen momentopname van een wijziging, met een beschrijving en een tijdstip.</td>
+</tr>
+<tr>
+<td><strong>Branch</strong></td>
+<td>Een aparte "werklijn" naast de hoofdversie. Je kunt er wijzigingen op maken zonder de hoofdversie aan te raken.</td>
+</tr>
+<tr>
+<td><strong><code>main</code></strong></td>
+<td>De hoofdbranch. Dit is de versie die live staat.</td>
+</tr>
+<tr>
+<td><strong>Pull request (PR)</strong></td>
+<td>Een voorstel op GitHub om een branch samen te voegen met <code>main</code>. Je kunt het bekijken en dan op "Merge" klikken.</td>
+</tr>
+<tr>
+<td><strong>Merge</strong></td>
+<td>Een branch samenvoegen met een andere, meestal met <code>main</code>.</td>
+</tr>
+<tr>
+<td><strong>Push</strong></td>
+<td>Commits vanuit de cloudcomputer naar GitHub sturen.</td>
+</tr>
+<tr>
+<td><strong>GitHub Pages</strong></td>
+<td>Een gratis functie van GitHub die de bestanden uit je repo als website online zet. Zo is je agenda bereikbaar in de browser.</td>
+</tr>
+<tr>
+<td><strong>Supabase</strong></td>
+<td>Een online dienst met een database en een inlogsysteem. Je agenda bewaart er je gegevens, zodat ze op al je toestellen hetzelfde zijn, en het verstuurt er meldingen vanuit.</td>
+</tr>
+<tr>
+<td><strong>localStorage</strong></td>
+<td>Een opslagplaats in je browser, op je toestel zelf. De agenda bewaart daar altijd een eigen kopie, ook zonder internet.</td>
+</tr>
+<tr>
+<td><strong>PWA</strong></td>
+<td>"Progressive Web App": een website die je als app op je telefoon kunt installeren (met eigen icoon, en ze werkt ook offline).</td>
+</tr>
+<tr>
+<td><strong>Service worker</strong></td>
+<td>Een klein script (<code>sw.js</code>) dat op de achtergrond in je browser draait. Het zorgt dat de app offline werkt en dat meldingen binnenkomen.</td>
+</tr>
+<tr>
+<td><strong>Web Push</strong></td>
+<td>De techniek waarmee een server een melding naar je telefoon kan sturen, ook als de app dicht is.</td>
+</tr>
+<tr>
+<td><strong>Edge Function</strong></td>
+<td>Een stukje code dat op de servers van Supabase draait (hier: de functie die meldingen verstuurt).</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2>Deel 2 — Het tijdsverloop, stap voor stap</h2>
+<h3>Vóór zaterdag 21 november, 10:26 — het begin</h3>
+<ul>
+<li>Het eerste ontwerp van de agenda (<code>Agenda.html</code>, 539 regels) bestond al voordat de repo werd
+  aangemaakt. <em>(afgeleid: vermoedelijk gemaakt in een gewone Claude-chat en daarna gedownload)</em>
+  Het bevatte al een kalender met maand-, week- en dagweergave en een zijbalk met to-do's.</li>
+</ul>
+<h3>Zaterdag 21 november — dag 1</h3>
+<p><strong>Op GitHub, door jou:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Tijd</th>
+<th>Wat gebeurde er</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10:26</td>
+<td>Je maakt de repository <strong><code>claude-bestanden</code></strong> aan op GitHub.</td>
+</tr>
+<tr>
+<td>10:28</td>
+<td>Je uploadt <code>Agenda.html</code> en een <code>README.md</code> via de knop "Add files via upload".</td>
+</tr>
+<tr>
+<td>10:42</td>
+<td>Je past <code>README.md</code> aan.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Daarna begint het werk met Claude Code.</strong> Werkwijze op dag 1: voor elke wijziging maakte ik een
+eigen <strong>branch</strong>, en daarna een <strong>pull request</strong>, die jij op GitHub samenvoegde met <code>main</code>
+("Merge pull request"). Dat gebeurde 20 keer.</p>
+<table>
+<thead>
+<tr>
+<th>Tijd</th>
+<th>Branch / PR</th>
+<th>Wat er veranderde</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>10:44</td>
+<td><code>english-code-cleanup</code></td>
+<td>De code (commentaar, namen, kleuren) wordt naar het Engels vertaald, de teksten op het scherm blijven Nederlands. De README wordt verwijderd. Oude, Nederlandse opgeslagen gegevens worden automatisch omgezet.</td>
+</tr>
+<tr>
+<td>10:49</td>
+<td>PR #1</td>
+<td>Eerste pull request. Die werd <strong>gesloten zonder samenvoegen</strong>, omdat jij intussen de README had aangepast en dat botste ("conflict").</td>
+</tr>
+<tr>
+<td>10:54</td>
+<td>PR #2</td>
+<td>Het conflict wordt opgelost (README blijft verwijderd) en jij voegt dit samen.</td>
+</tr>
+<tr>
+<td>11:09</td>
+<td><code>supabase-sync</code></td>
+<td><strong>Inloggen en synchronisatie met Supabase</strong> toegevoegd. Nieuw bestand: <code>supabase-setup.sql</code>.</td>
+</tr>
+<tr>
+<td>11:10</td>
+<td><code>supabase-sync</code></td>
+<td>Het adres van jouw Supabase-project wordt ingevuld.</td>
+</tr>
+<tr>
+<td>11:24</td>
+<td>PR #3</td>
+<td>Samengevoegd.</td>
+</tr>
+<tr>
+<td>11:27–11:35</td>
+<td>PR #4</td>
+<td>Bij inloggen worden nu de echte foutmeldingen getoond. <em>(afgeleid: het inloggen lukte eerst niet en we moesten zien waarom)</em></td>
+</tr>
+<tr>
+<td>11:37</td>
+<td><code>add-index</code>, PR #5</td>
+<td>Nieuw bestand <code>index.html</code>: dat stuurt bezoekers automatisch door naar <code>Agenda.html</code>. Nodig voor <strong>GitHub Pages</strong>, dat altijd <code>index.html</code> opent. <em>(afgeleid: rond dit moment zette je GitHub Pages aan in de instellingen van de repo)</em></td>
+</tr>
+<tr>
+<td>12:23</td>
+<td><code>quick-add</code>, PR #6</td>
+<td>De <strong>invoerbalk</strong> die Nederlandse zinnen begrijpt, bv. <em>voeg 'voetbaltraining' toe op 23 november van 19u30-21u</em>.</td>
+</tr>
+<tr>
+<td>12:32</td>
+<td><code>weekday-repeat</code>, PR #7</td>
+<td>Afspraken <strong>herhalen op gekozen weekdagen</strong> (vinkjes ma t/m zo, met einddatum).</td>
+</tr>
+<tr>
+<td>12:34</td>
+<td><code>quick-repeat</code>, PR #8</td>
+<td>De invoerbalk begrijpt herhalingen: <em>elke maandag</em>, <em>elke werkdag</em>, <em>dagelijks</em>.</td>
+</tr>
+<tr>
+<td>12:40</td>
+<td><code>quick-robust</code>, PR #9</td>
+<td>Meer manieren van formuleren worden begrepen, en er staat nu een <strong>versienummer</strong> in beeld.</td>
+</tr>
+<tr>
+<td>12:42</td>
+<td><code>undo</code>, PR #10</td>
+<td>Knop <strong>Ongedaan maken</strong> (tot 50 stappen, ook met Ctrl+Z).</td>
+</tr>
+<tr>
+<td>12:45</td>
+<td><code>black-work</code>, PR #11</td>
+<td>Afspraken met <strong>"werk"</strong> in de titel worden altijd <strong>zwart</strong>.</td>
+</tr>
+<tr>
+<td>12:53</td>
+<td><code>quick-modify</code>, PR #12</td>
+<td>Via de balk bestaande afspraken <strong>aanpassen</strong>, en een kleur kiezen per type.</td>
+</tr>
+<tr>
+<td>12:58</td>
+<td><code>quick-delete</code>, PR #13</td>
+<td>Via de balk afspraken <strong>verwijderen</strong>. Dubbele afspraken worden samengevoegd bij aanpassen.</td>
+</tr>
+<tr>
+<td>13:01</td>
+<td><code>scoped-modify</code>, PR #14</td>
+<td>Aanpassen voor <strong>alleen de genoemde weekdagen</strong> van een reeks.</td>
+</tr>
+<tr>
+<td>13:03</td>
+<td><code>auto-update</code>, PR #15</td>
+<td><strong>Automatisch bijwerken</strong>: een open agenda merkt dat er een nieuwere versie online staat en herlaadt zichzelf.</td>
+</tr>
+<tr>
+<td>13:11</td>
+<td><code>date-scope</code>, PR #16</td>
+<td>Eén dag, bepaalde weekdagen of een <strong>periode</strong> van een reeks verwijderen of aanpassen.</td>
+</tr>
+<tr>
+<td>13:23</td>
+<td><code>pwa</code>, PR #17</td>
+<td><strong>Installeerbare app (PWA)</strong>: nieuwe bestanden <code>manifest.json</code>, <code>sw.js</code> en de icoontjes <code>icon-180/192/512.png</code> en <code>icon-maskable-512.png</code>. Werkt ook offline.</td>
+</tr>
+<tr>
+<td>13:31</td>
+<td><code>day-overview</code>, PR #18</td>
+<td>Op smalle schermen (telefoon) een <strong>dagoverzicht onder de kalender</strong>. Tikken op een dag in de maand selecteert die dag.</td>
+</tr>
+<tr>
+<td>13:37</td>
+<td><code>todo-deadlines</code>, PR #19</td>
+<td>To-do's via de invoerbalk, <strong>herhalende to-do's</strong> (dagelijks of op weekdagen) en <strong>deadlines</strong> zichtbaar in de kalender.</td>
+</tr>
+<tr>
+<td>13:45</td>
+<td><code>voice-input</code>, PR #20</td>
+<td><strong>Spraakinvoer</strong>: microfoonknop. Wat je zegt verschijnt in de balk, zodat je het kunt nakijken voor je het toevoegt.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>In Supabase, door jou, op dag 1</strong> <em>(afgeleid uit de code en <code>supabase-setup.sql</code>)</em>:
+1. Een account aangemaakt op supabase.com en een <strong>project</strong> aangemaakt
+   (projectcode <code>xvuqcmmxarvkpcetztno</code>).
+2. In de <strong>SQL Editor</strong> de inhoud van <code>supabase-setup.sql</code> geplakt en uitgevoerd. Dat maakte:
+   - de tabel <strong><code>agenda_data</code></strong>: één rij per gebruiker, met de hele agenda (afspraken, to-do's, doelen) erin;
+   - <strong>beveiligingsregels</strong> (Row Level Security): elke gebruiker kan alleen zijn eigen rij zien en wijzigen.
+3. Een <strong>gebruiker met e-mail en wachtwoord</strong> aangemaakt. De app kan alleen inloggen, niet zelf
+   registreren, dus dit gebeurde in Supabase onder <em>Authentication → Users</em>.
+4. Het <strong>projectadres</strong> (URL) en de <strong>publieke sleutel</strong> (<code>sb_publishable_…</code>) doorgegeven. Die
+   staan nu in <code>Agenda.html</code>. Die publieke sleutel mag openbaar zijn: de beveiligingsregels
+   bepalen wat iemand ermee kan.</p>
+<h3>Zondag 22 november — dag 2</h3>
+<p>De werkwijze veranderde: er werden geen pull requests meer gemaakt. Ik werkte verder op de branch
+<code>voice-input</code> en voegde elke wijziging <strong>zelf</strong> samen met <code>main</code> en pushte die meteen naar GitHub
+("Merge branch 'voice-input'"). Zo stond elke verbetering binnen een minuut live.</p>
+<table>
+<thead>
+<tr>
+<th>Tijd</th>
+<th>Wat er veranderde</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>11:58</td>
+<td><strong>Herhalende doelen</strong> (dagelijks, om de 2 dagen, wekelijks) met een vinkje per dag en een <strong>focus-ster</strong>.</td>
+</tr>
+<tr>
+<td>12:02</td>
+<td>Doelen <strong>"zelf kiezen"</strong> per dag (<em>ook morgen</em> / <em>niet vandaag</em>), en een dag overslaan bij geplande doelen.</td>
+</tr>
+<tr>
+<td>12:09</td>
+<td>De sectie heet voortaan <strong>"Dagelijkse doelen"</strong>.</td>
+</tr>
+<tr>
+<td>12:16</td>
+<td><strong>Meldingen en alarmen</strong> via Web Push. Nieuwe bestanden: <code>supabase-reminders.sql</code> en <code>supabase/functions/send-reminders/index.ts</code>. <code>sw.js</code> kan nu meldingen tonen.</td>
+</tr>
+<tr>
+<td>13:09</td>
+<td>Kleine aanpassing aan de Edge Function, omdat die anders <strong>niet wilde installeren</strong> via het Supabase-dashboard. <em>(afgeleid: je kreeg een fout bij het deployen)</em></td>
+</tr>
+<tr>
+<td>13:15</td>
+<td>Aanvulling in <code>supabase-reminders.sql</code>: expliciete <strong>rechten op de tabellen</strong>. <em>(afgeleid: het SQL-script gaf een rechtenprobleem)</em></td>
+</tr>
+<tr>
+<td>13:40</td>
+<td>Via de balk of spraak een <strong>melding</strong> of <strong>alarm</strong> instellen: minuten, uren of dagen vooraf, bij de start, of op een tijdstip.</td>
+</tr>
+<tr>
+<td>13:47</td>
+<td><strong>15 kleuren</strong> (ook geel) voor afspraken en to-do's. De app toont nu <strong>waarom</strong> meldingen mislukken.</td>
+</tr>
+<tr>
+<td>13:53</td>
+<td>Overgeslagen of niet gekozen doelen komen in een ingeklapt vak <strong>"Niet vandaag"</strong>.</td>
+</tr>
+<tr>
+<td>14:01</td>
+<td>Meldingen: een gewijzigd tijdstip telt als nieuwe melding, net verstreken tijden worden nog aanvaard, en alarmen van verwijderde afspraken stoppen.</td>
+</tr>
+<tr>
+<td>14:07</td>
+<td><strong>Wisknop (×)</strong> in de invoerbalk.</td>
+</tr>
+<tr>
+<td>—</td>
+<td>Je gebruikte <code>/clear</code> om met een lege context verder te gaan en besloot de agenda-app even te laten rusten.</td>
+</tr>
+<tr>
+<td>14:14</td>
+<td><strong><code>CLAUDE.md</code></strong> toegevoegd: een projectbriefje dat elke nieuwe Claude-chat automatisch inleest (branch <code>claude-md</code>, samengevoegd met <code>main</code>).</td>
+</tr>
+</tbody>
+</table>
+<p><strong>In Supabase, door jou, op dag 2</strong> <em>(uit <code>meldingen-installatie.md</code>)</em>:
+1. <strong>SQL Editor</strong>: het meldingen-script uitgevoerd. Dat maakte:
+   - tabel <strong><code>push_subs</code></strong>: welke telefoons/browsers meldingen mogen ontvangen;
+   - tabel <strong><code>reminders</code></strong>: alle meldingen en alarmen van de komende 30 dagen;
+   - functie <strong><code>replace_reminders</code></strong>: de app vervangt hiermee in één keer alle nog niet verstuurde meldingen;
+   - functie <strong><code>ack_reminder</code></strong>: voor de knop "Stop" op een alarm;
+   - een <strong>geplande taak (pg_cron)</strong> die <strong>elke minuut</strong> de Edge Function aanroept.
+2. <strong>Edge Functions → Secrets</strong>: drie geheimen toegevoegd: <code>VAPID_PUBLIC_KEY</code>, <code>VAPID_PRIVATE_KEY</code>
+   en <code>CRON_SECRET</code>.
+3. <strong>Edge Functions → Deploy a new function → Via Editor</strong>: de functie <strong><code>send-reminders</code></strong>
+   aangemaakt met de code uit de repo, en <strong>"Verify JWT" uitgezet</strong> (de functie controleert in
+   plaats daarvan het <code>CRON_SECRET</code>).
+4. <strong>Op je telefoon</strong>: de agenda geopend, ingelogd, op het <strong>belletje</strong> getikt en meldingen toegestaan.</p>
+<hr />
+<h2>Deel 3 — Hoe alles samenwerkt</h2>
+<pre><code> GITHUB PAGES  (zet de app online)
+      │
+      │ 1. je browser laadt Agenda.html, sw.js, icoontjes
+      ▼
+ JOUW TELEFOON / COMPUTER
+   • browser of geïnstalleerde app
+   • localStorage: eigen kopie van je agenda
+   • sw.js: offline werken + meldingen tonen
+      │                              ▲
+      │ 2. synchroniseren            │ 3. Web Push-melding
+      │    na inloggen               │
+      ▼                              │
+ SUPABASE
+   • Auth: inloggen
+   • tabel agenda_data: je hele agenda
+   • tabellen reminders + push_subs
+   • pg_cron ──elke minuut──▶ Edge Function send-reminders
+</code></pre>
+<ol>
+<li><strong>De app openen</strong>: je browser haalt <code>Agenda.html</code> op van <strong>GitHub Pages</strong>.</li>
+<li><strong>Gegevens</strong>: alles wat je invoert, gaat eerst naar <strong>localStorage</strong> op je toestel. Ben je
+   ingelogd, dan stuurt de app het kort daarna naar de tabel <strong><code>agenda_data</code></strong> in Supabase. Op een
+   ander toestel haalt de app het daar weer op.</li>
+<li><strong>Meldingen</strong>: de app zet alle meldingen van de komende 30 dagen in de tabel <strong><code>reminders</code></strong>.
+   Elke minuut roept <strong>pg_cron</strong> de functie <strong><code>send-reminders</code></strong> aan. Die kijkt wat er nu moet
+   afgaan en stuurt een <strong>Web Push</strong> naar elke telefoon in <strong><code>push_subs</code></strong>. De service worker op je
+   telefoon toont de melding. Een <strong>alarm</strong> herhaalt zich elke minuut (maximaal 10 keer) tot je op
+   <strong>Stop</strong> tikt.</li>
+<li><strong>Updates</strong>: verandert er iets aan de app, dan verhoog ik <code>APP_VERSION</code>. Een open agenda merkt
+   dat en herlaadt zichzelf.</li>
+</ol>
+<hr />
+<h2>Deel 4 — Wat staat waar?</h2>
+<h3>Op GitHub — repository <code>JornBage/claude-bestanden</code> (openbaar)</h3>
+<table>
+<thead>
+<tr>
+<th>Bestand</th>
+<th>Wat het is</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>Agenda.html</code></td>
+<td><strong>De hele app</strong> in één bestand (ongeveer 1600 regels): opmaak, uiterlijk en alle logica.</td>
+</tr>
+<tr>
+<td><code>index.html</code></td>
+<td>Doorverwijzing naar <code>Agenda.html</code>, voor GitHub Pages.</td>
+</tr>
+<tr>
+<td><code>manifest.json</code></td>
+<td>Naam, kleuren en icoontjes van de installeerbare app.</td>
+</tr>
+<tr>
+<td><code>icon-180.png</code>, <code>icon-192.png</code>, <code>icon-512.png</code>, <code>icon-maskable-512.png</code></td>
+<td>App-icoontjes in verschillende formaten.</td>
+</tr>
+<tr>
+<td><code>sw.js</code></td>
+<td>Service worker: offline werken en meldingen tonen.</td>
+</tr>
+<tr>
+<td><code>supabase-setup.sql</code></td>
+<td>Het script voor de tabel <code>agenda_data</code> (al uitgevoerd in Supabase).</td>
+</tr>
+<tr>
+<td><code>supabase-reminders.sql</code></td>
+<td>Het script voor meldingen (al uitgevoerd). In deze versie staat <code>&lt;CRON_SECRET&gt;</code> als lege plek in plaats van het echte geheim.</td>
+</tr>
+<tr>
+<td><code>supabase/functions/send-reminders/index.ts</code></td>
+<td>De code van de Edge Function (de echte versie draait in Supabase).</td>
+</tr>
+<tr>
+<td><code>CLAUDE.md</code></td>
+<td>Projectbriefje voor nieuwe Claude-chats.</td>
+</tr>
+<tr>
+<td><code>UITLEG.md</code></td>
+<td>Dit document (op branch <code>uitleg</code>).</td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li><strong>Branches</strong>: <code>main</code> is de live versie. Daarnaast staan er nog ongeveer 20 oude branches
+  (<code>quick-add</code>, <code>pwa</code>, <code>voice-input</code>, …). Die zijn allemaal al in <code>main</code> verwerkt. Ze kunnen blijven
+  staan of opgeruimd worden, ze doen niets.</li>
+<li><strong>Website</strong>: via GitHub Pages, normaal op <strong>https://jornbage.github.io/claude-bestanden/</strong>.</li>
+<li><strong>Geschiedenis</strong>: op GitHub onder <em>Commits</em> (63 stuks) en <em>Pull requests</em> (20, waarvan 19 samengevoegd).</li>
+</ul>
+<h3>In Supabase — project <code>xvuqcmmxarvkpcetztno</code></h3>
+<table>
+<thead>
+<tr>
+<th>Onderdeel</th>
+<th>Waar in het dashboard</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Je gebruikersaccount</td>
+<td>Authentication → Users</td>
+</tr>
+<tr>
+<td>Tabellen <code>agenda_data</code>, <code>push_subs</code>, <code>reminders</code></td>
+<td>Table Editor</td>
+</tr>
+<tr>
+<td>Functies <code>replace_reminders</code>, <code>ack_reminder</code></td>
+<td>Database → Functions</td>
+</tr>
+<tr>
+<td>Geplande taak <code>send-reminders</code> (elke minuut)</td>
+<td>Integrations → Cron (of Database → Cron Jobs)</td>
+</tr>
+<tr>
+<td>Edge Function <code>send-reminders</code></td>
+<td>Edge Functions</td>
+</tr>
+<tr>
+<td>Geheimen <code>VAPID_PUBLIC_KEY</code>, <code>VAPID_PRIVATE_KEY</code>, <code>CRON_SECRET</code></td>
+<td>Edge Functions → Secrets</td>
+</tr>
+</tbody>
+</table>
+<h3>Op je toestellen</h3>
+<ul>
+<li><strong>localStorage</strong> van de browser: een kopie van je agenda en je weergave-instellingen
+  (bv. maand of week, zijbalk open of dicht).</li>
+<li><strong>Cache van de service worker</strong>: de app-bestanden, voor offline gebruik.</li>
+<li><strong>Meldingsabonnement</strong> van je telefoon (dat staat ook in <code>push_subs</code>).</li>
+</ul>
+<h3>Alleen in de cloudcomputer van Claude (tijdelijk!)</h3>
+<ul>
+<li><strong><code>meldingen-installatie.md</code></strong>: de installatie-instructies <strong>met de echte geheime sleutels</strong>.
+  Staat bewust niet op GitHub. <strong>Dit bestand verdwijnt</strong> als deze cloudomgeving wordt opgeruimd.
+  Bewaar de inhoud dus zelf op een veilige plek (bv. een wachtwoordmanager).</li>
+</ul>
+<h3>In Claude</h3>
+<ul>
+<li>De <strong>gesprekken</strong> zelf staan in je lijst met Claude Code-sessies. Na <code>/clear</code> weet de chat de
+  inhoud niet meer, maar de bestanden op GitHub blijven gewoon bestaan.</li>
+</ul>
+<hr />
+<h2>Deel 5 — Wat de app nu allemaal kan (overzicht)</h2>
+<ul>
+<li>Kalender met <strong>maand-, week- en dagweergave</strong>, rode lijn op het huidige tijdstip.</li>
+<li><strong>Afspraken</strong> met 15 kleuren. "Werk"-afspraken worden zwart.</li>
+<li><strong>Herhalende afspraken</strong> op gekozen weekdagen, met einddatum.</li>
+<li><strong>To-do's</strong>: eenmalig, herhalend (dagelijks of op weekdagen) of met <strong>deadline</strong> in de kalender.</li>
+<li><strong>Dagelijkse doelen</strong>: dagelijks, om de 2 dagen, wekelijks, of zelf kiezen. Met focus-ster en een
+  vak "Niet vandaag".</li>
+<li><strong>Invoerbalk</strong> die Nederlandse zinnen begrijpt: toevoegen, aanpassen, verwijderen (ook voor een
+  deel van een reeks), herhalingen, meldingen en alarmen. Met <strong>wisknop</strong>.</li>
+<li><strong>Spraakinvoer</strong> (microfoonknop, in Chrome).</li>
+<li><strong>Ongedaan maken</strong> (50 stappen, Ctrl+Z).</li>
+<li><strong>Inloggen</strong> en <strong>synchronisatie</strong> tussen toestellen via Supabase.</li>
+<li><strong>Meldingen en alarmen</strong> op je telefoon, ook als de app dicht is.</li>
+<li><strong>Installeerbaar als app</strong> en <strong>werkt offline</strong>.</li>
+<li><strong>Werkt zichzelf automatisch bij</strong> als er een nieuwe versie online staat.</li>
+<li>Op smalle schermen een <strong>dagoverzicht</strong> onder de kalender.</li>
+</ul></body></html>
