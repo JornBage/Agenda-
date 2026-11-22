@@ -372,7 +372,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=23; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=24; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -905,7 +905,7 @@ $("#remScrim").addEventListener("click",function(e){if(e.target===this)closeRem(
 function buildReminders(){
   var out=[],seen={},now=Date.now();
   function add(id,d,kind,at,title,body){
-    var k=id+"|"+d+"|"+kind;if(seen[k]||at.getTime()<=now)return;seen[k]=1;
+    var k=id+"|"+d+"|"+kind+"|"+at.toISOString().slice(0,16);if(seen[k]||at.getTime()<now-60000)return;seen[k]=1;
     out.push({key:k,kind:kind,fire_at:at.toISOString(),title:title,body:body});
   }
   for(var i=0;i<=30;i++){
@@ -930,6 +930,10 @@ function syncReminders(){
   sync.client.rpc("replace_reminders",{rows:rows}).then(function(r){
     if(r.error){setStatus("Meldingen niet doorgegeven: "+(r.error.message||"fout"));return}
     remLast=j;
+    var want={};rows.forEach(function(x){want[x.key]=1});
+    sync.client.from("reminders").select("id,token,key").is("acked_at",null).not("sent_at","is",null).then(function(q){
+      (q.data||[]).forEach(function(x){if(!want[x.key])sync.client.rpc("ack_reminder",{p_id:x.id,p_token:x.token})});
+    });
   },function(){setStatus("Meldingen niet doorgegeven (offline?)")});
 }
 function b64u(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="===".slice((s.length+3)%4);var r=atob(s),a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a}
