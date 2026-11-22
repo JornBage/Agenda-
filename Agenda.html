@@ -218,7 +218,11 @@ button{cursor:pointer}
 
 /* Quick add bar */
 .quick{display:flex;align-items:center;gap:8px;padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--line);flex-wrap:wrap}
-.quick input{flex:1 1 280px;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px}
+.quick .qwrap{flex:1 1 280px;min-width:0;position:relative;display:flex}
+.quick .qwrap input{padding-right:34px}
+.qclear{position:absolute;right:4px;top:50%;transform:translateY(-50%);width:26px;height:26px;border:0;border-radius:50%;background:var(--line);color:var(--ink);font-size:17px;line-height:1;padding:0;cursor:pointer}
+.qclear:hover{background:var(--muted);color:var(--surface)}
+.quick input{flex:1 1 auto;width:100%;min-width:0;border:1px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 10px}
 .quick .status{flex:1 1 100%}
 .quick .status:empty{display:none}
 .quick .status.err{color:var(--c-red)}
@@ -274,7 +278,7 @@ button{cursor:pointer}
   </header>
 
   <form class="quick" id="quickForm" autocomplete="off">
-    <input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u">
+    <span class="qwrap"><input type="text" id="quickInput" maxlength="200" aria-label="Snel een afspraak of to-do toevoegen" placeholder="Typ bv.: voeg 'voetbaltraining' toe op 23 november van 19u30-21u"><button type="button" class="qclear" id="quickClear" hidden aria-label="Invoer wissen" title="Wissen">&times;</button></span>
     <button class="btn mic" type="button" id="micBtn" hidden aria-label="Spreek je opdracht in" title="Spreek in">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M9 21h6"/></svg>
     </button>
@@ -372,7 +376,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=24; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=25; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -1382,6 +1386,10 @@ function repeatLabel(rp){
   if(rp.days.length===7)return "elke dag";
   return "elke "+rp.days.slice().sort(function(x,y){return (x+6)%7-(y+6)%7}).map(function(x){return SHORT_DAYS[x]}).join(", ");
 }
+function syncClear(){$("#quickClear").hidden=!$("#quickInput").value}
+$("#quickInput").addEventListener("input",syncClear);
+$("#quickClear").addEventListener("click",function(){var i=$("#quickInput");i.value="";syncClear();i.focus()});
+setInterval(syncClear,400); /* also catches text filled in by voice input or after adding */
 $("#quickForm").addEventListener("submit",function(e){
   e.preventDefault();
   var inp=$("#quickInput"),msg=$("#quickMsg"),v=inp.value.trim();if(!v)return;
