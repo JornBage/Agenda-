@@ -361,7 +361,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=20; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=21; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -762,6 +762,8 @@ function openDlg(e,def){
   $("#f-start").value=v.start||"09:00";
   $("#f-end").value=v.end||"10:00";
   setColor(v.color||"blue");
+  ["notify","alarm"].forEach(function(k){var sel=$("#f-"+k),val=v[k];
+    if(val!=null&&!sel.querySelector('option[value="'+val+'"]')){var o=document.createElement("option");o.value=val;o.textContent=(val%1440?(val%60?val+" min":val/60+" uur"):val/1440+" dag")+" vooraf";sel.appendChild(o)}});
   $("#f-notify").value=v.notify!=null?String(v.notify):"";
   $("#f-alarm").value=v.alarm!=null?String(v.alarm):"";
   var rp=v.repeat||null;
@@ -951,6 +953,11 @@ var MONTHS={januari:1,februari:2,maart:3,april:4,mei:5,juni:6,juli:7,augustus:8,
 var WEEKDAYS={zondag:0,maandag:1,dinsdag:2,woensdag:3,donderdag:4,vrijdag:5,zaterdag:6};
 var SHORT_DAYS=["zo","ma","di","wo","do","vr","za"];
 var UNIT="(?:uur|u|h|:)(?![a-zA-Z])";
+var RE_REMKW=/(?:\b(?:met|en|plus|zet|stel)\s+)?(?:\b(?:een|de|het|mijn)\s+)?\b(meldingen|melding|herinneringen|herinnering|notificatie|alarmen|alarm|wekker)\b(?:\s+in)?/i;
+var REM_NUM={een:1,"\u00e9\u00e9n":1,twee:2,drie:3,vier:4,vijf:5,zes:6,tien:10,twintig:20,dertig:30,half:0.5,"een half":0.5};
+var RE_REMREL=/^\s*(?:van\s+|op\s+)?(\d+|een\s+half|een|\u00e9\u00e9n|twee|drie|vier|vijf|zes|tien|twintig|dertig|half)\s*(minuten|minuut|min|m|kwartier|uren|uur|u|h|dagen|dag|d)(?![a-z])\s*(vooraf|voordien|ervoor|eerder|op\s+voorhand|van\s+tevoren|voor\s+(?:de\s+|het\s+)?(?:start|begin|aanvang))?/i;
+var RE_REMABS=/^\s*(?:om|op|voor|rond)?\s*(\d{1,2})\s*(?:uur|u|h|:)(?![a-zA-Z])\s*(\d{2})?/i;
+var RE_REMSTART=/^\s*(?:bij|op|aan)\s+(?:de\s+|het\s+)?(?:start|begin|aanvang|tijd)\b/i;
 var RE_RANGE=new RegExp("(\\d{1,2})(?:\\s*"+UNIT+"\\s*(\\d{2})?)?\\s*(?:-|–|tot)\\s*(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
 var RE_TIME=new RegExp("(\\d{1,2})\\s*"+UNIT+"\\s*(\\d{2})?","i");
 var DAYWORD="(?:maandag|dinsdag|woensdag|donderdag|vrijdag|zaterdag|zondag|werkdagen|werkdag|weekenddagen|weekend|dagen|dag|ma|di|wo|do|vr|za|zo)";
@@ -1023,6 +1030,22 @@ function parseQuick(input){
   }
   m=take(/["“„«'‘](.+?)["”»'’]/);
   if(m)r.title=m[1].trim();
+  /* notification / alarm: "melding 15 min vooraf", "alarm om 7u30", "met alarm bij de start", "herinnering een dag vooraf" */
+  r.rem={};
+  for(var ri=0;ri<2;ri++){
+    var km=s.match(RE_REMKW);if(!km)break;
+    var kind=/alarm|wekker/i.test(km[1])?"alarm":"notify",rest=s.slice(km.index+km[0].length),used=0,val={bare:true},x;
+    if((x=rest.match(RE_REMREL))&&(x[3]||!/^(?:u|uur|uren|h)$/i.test(x[2]))){
+      var n=REM_NUM[x[1].toLowerCase()]!=null?REM_NUM[x[1].toLowerCase()]:+x[1],u=x[2].toLowerCase();
+      val={min:Math.round(n*(/^d/.test(u)?1440:/^k/.test(u)?15:/^(?:u|uur|uren|h)$/.test(u)?60:1))};used=x[0].length;
+    }else if((x=rest.match(RE_REMABS))){
+      var t=hm(x[1],x[2]);if(!t)return {error:"Ongeldige tijd voor de "+(kind==="alarm"?"wekker":"melding")+"."};
+      val={at:t};used=x[0].length;
+    }else if((x=rest.match(RE_REMSTART))){val={min:0};used=x[0].length}
+    if(r.rem[kind])break;
+    r.rem[kind]=val;
+    s=s.slice(0,km.index)+" "+rest.slice(used);
+  }
   /* colour: "in het rood", "kleur groen", or a bare colour word next to a quoted title */
   if(r.kind!=="todo"){
     m=s.match(RE_COLOR);
@@ -1106,6 +1129,23 @@ function parseQuick(input){
     if(weekly)days=[parse(r.date).getDay()];
     if(until&&r.date&&until<r.date)return {error:"De einddatum ligt voor de startdatum."};
     r.repeat=every<0?{manual:true,days:[],until:until}:{days:days,until:until};if(every>0)r.repeat.every=every;
+  }
+  /* resolve notification/alarm now that the time is known */
+  var rk=Object.keys(r.rem);
+  if(rk.length&&r.kind==="delete")return {error:"Bij verwijderen kun je geen melding of alarm opgeven."};
+  for(var ki=0;ki<rk.length;ki++){
+    var k=rk[ki],v=r.rem[k],word=k==="alarm"?"het alarm":"de melding";
+    if(r.kind==="todo"){
+      if(!v.at)return {error:"Zeg hoe laat "+word+" moet komen, bv. "+(k==="alarm"?"alarm om 7u30":"melding om 9u")+"."};
+      r[k]=v.at;
+    }else{
+      if(v.at&&r.kind==="modify"){(r.remAt=r.remAt||{})[k]=v.at;r[k]=v.at}   /* resolved per item in modifyEvents */
+      else if(v.at){
+        var base=r.hasTime?toMin(r.start):540;
+        if(toMin(v.at)>base)return {error:"Het tijdstip van "+word+" ligt na het begin van de afspraak."};
+        r[k]=base-toMin(v.at);
+      }else r[k]=v.bare?0:v.min;
+    }
   }
   /* title */
   if(r.kind==="delete"){
@@ -1197,14 +1237,31 @@ function selLabel(sel,scope){
    Selection: weekdays ("elke ma, di, do") and/or a day or period ("op 25 november", "van X tot Y", "vanaf X");
    only that part changes and a series is split so the rest keeps its old settings.
    Weekdays alone (no other change, no period) set the days of the series. */
+function remDesc(r){
+  function one(k,ic){var v=r[k];if(v==null)return "";
+    if(typeof v==="string")return ", "+ic+" om "+v;
+    return ", "+ic+" "+(v===0?"bij de start":(v%1440?(v%60?v+" min":v/60+" uur"):v/1440+" dag")+" vooraf");}
+  return one("notify","\uD83D\uDD14")+one("alarm","\u23F0");
+}
 function modifyEvents(r){
   var t=r.title.toLowerCase();
   var hits=data.events.filter(function(e){return e.title.toLowerCase()===t});
   if(!hits.length)hits=data.events.filter(function(e){return e.title.toLowerCase().indexOf(t)>=0});
+  var remOnly=(r.notify!=null||r.alarm!=null)&&!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.untilGiven||r.date||r.color||r.repeat||r.sel);
+  if(!hits.length&&remOnly){
+    var th=data.todos.filter(function(x){return x.text.toLowerCase()===t});
+    if(!th.length)th=data.todos.filter(function(x){return x.text.toLowerCase().indexOf(t)>=0});
+    if(th.length){
+      var at=r.remAt||{};
+      if((r.notify!=null&&!at.notify)||(r.alarm!=null&&!at.alarm))return {error:"Zeg voor een to-do hoe laat, bv. aanpassen '"+th[0].text+"' alarm om 7u30."};
+      th.forEach(function(x){if(at.notify)x.notify=at.notify;if(at.alarm)x.alarm=at.alarm});
+      return {todoRem:th.length,title:th[0].text};
+    }
+  }
   if(!hits.length)return {error:"Ik vond geen afspraak met '"+r.title+"'."};
   var sel=r.sel;
   if(r.clearRepeat&&sel&&sel.from&&sel.from===sel.to&&!r.date){r.date=sel.from;sel=null} /* "niet meer herhalen op 25 november" */
-  var others=!!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.untilGiven||r.date||r.color);
+  var others=!!(r.newTitle||r.hasTime||r.setAllDay||r.clearRepeat||r.untilGiven||r.date||r.color||r.notify!=null||r.alarm!=null);
   if(!others&&!r.repeat&&!sel)
     return {error:"Zeg wat je wilt aanpassen, bv. aanpassen '"+r.title+"' van 9u-17u"};
   if(!others&&sel)
@@ -1219,6 +1276,13 @@ function modifyEvents(r){
     if(r.setAllDay){e.allDay=true;e.start="00:00";e.end="23:59"}
     if(r.date)e.date=r.date;
     if(r.color)e.color=r.color;
+    var ra=r.remAt||{},bad=null;
+    ["notify","alarm"].forEach(function(k){
+      if(r[k]==null)return;
+      if(ra[k]){var base=e.allDay?540:toMin(e.start),mn=base-toMin(ra[k]);if(mn<0)bad=k;else e[k]=mn}
+      else e[k]=r[k];
+    });
+    if(bad)return "Het tijdstip van "+(bad==="alarm"?"het alarm":"de melding")+" ligt na het begin van '"+e.title+"'.";
     if(r.clearRepeat)delete e.repeat;
     else if(r.repeat&&withDays)e.repeat={days:r.repeat.days,until:r.untilGiven?r.until:(e.repeat?e.repeat.until:null)};
     else if(r.untilGiven){
@@ -1293,8 +1357,10 @@ $("#quickForm").addEventListener("submit",function(e){
     var res=modifyEvents(r);
     msg.classList.toggle("err",!!res.error);
     if(res.error){msg.textContent=res.error;return}
+    if(res.todoRem){msg.textContent="Aangepast: "+res.title+remDesc(r)+(res.todoRem>1?" ("+res.todoRem+" taken)":"");save();renderAll();inp.value="";return}
     ui.cursor=firstOn(res.first);
     msg.textContent="Aangepast"+(res.n>1?" ("+res.n+" afspraken)":"")+(res.label?" (alleen "+res.label+")":"")+": "+res.first.title+" \u2014 "+describeEvent(res.first)
+      +((r.notify!=null||r.alarm!=null)?remDesc({notify:res.first.notify,alarm:res.first.alarm}):"")
       +(res.merged?". "+res.merged+" dubbele "+(res.merged>1?"afspraken":"afspraak")+" samengevoegd.":"");
   }else if(r.kind==="delete"){
     var del=deleteEvents(r);
@@ -1306,6 +1372,7 @@ $("#quickForm").addEventListener("submit",function(e){
   }else if(r.kind==="todo"){
     var td={id:uid(),text:r.title,done:false,date:r.date};
     if(r.deadline)td.deadline=r.deadline;
+    if(r.notify)td.notify=r.notify;if(r.alarm)td.alarm=r.alarm;
     if(r.repeat){td.repeat=r.repeat;td.doneDates=[];if(r.repeat.manual)td.planDates=[r.date]}
     data.todos.push(td);
     if(r.date)ui.cursor=r.date;else if(r.deadline)ui.cursor=r.deadline;
@@ -1314,6 +1381,7 @@ $("#quickForm").addEventListener("submit",function(e){
       : (r.date?" ("+fLong(r.date)+")":" (algemeen)"))+(r.deadline?", deadline "+fLong(r.deadline):"");
   }else{
     var ev={id:uid(),title:r.title,date:r.date,start:r.allDay?"00:00":r.start,end:r.allDay?"23:59":r.end,allDay:r.allDay,color:r.color||"blue"};
+    if(r.notify!=null)ev.notify=r.notify;if(r.alarm!=null)ev.alarm=r.alarm;
     var first=r.date;
     if(r.repeat){
       ev.repeat=r.repeat;
@@ -1326,6 +1394,7 @@ $("#quickForm").addEventListener("submit",function(e){
       : fLong(r.date)+", "+when);
     if(r.color)msg.textContent+=", "+COLOR_NL[colorOf(ev)]+(colorOf(ev)==="black"&&r.color!=="black"?" (afspraken met 'werk' zijn altijd zwart)":"");
   }
+  if(r.kind!=="delete"&&r.kind!=="modify")msg.textContent+=remDesc(r);
   inp.value="";save();renderAll();
 });
 
