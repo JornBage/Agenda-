@@ -31,6 +31,11 @@ create index if not exists reminders_due on public.reminders (fire_at) where ack
 alter table public.reminders enable row level security;
 create policy "rem_select_own" on public.reminders for select to authenticated using ((select auth.uid()) = user_id);
 
+-- Table rights (newer Supabase projects do not grant these automatically).
+grant select, insert, update, delete on public.push_subs to authenticated, service_role;
+grant select on public.reminders to authenticated;
+grant select, insert, update, delete on public.reminders to service_role;
+
 -- The app replaces all not-yet-sent reminders of the logged-in user in one go.
 create or replace function public.replace_reminders(rows jsonb)
 returns void language plpgsql security definer set search_path = public as $$
