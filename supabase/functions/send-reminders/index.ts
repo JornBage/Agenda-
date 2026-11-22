@@ -22,7 +22,7 @@ Deno.serve(async (req) => {
   const todo = (due ?? []).filter((r) =>
     r.kind === "notify" ? !r.sent_at
       : r.repeats < ALARM_MAX && (!r.last_sent || now.getTime() - new Date(r.last_sent).getTime() > 50e3));
-  const subsByUser: Record<string, { endpoint: string; sub: webpush.PushSubscription }[]> = {};
+  const subsByUser: Record<string, { endpoint: string; sub: any }[]> = {};
   let sent = 0;
 
   for (const r of todo) {
