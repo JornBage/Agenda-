@@ -24,11 +24,13 @@ Deno.serve(async (req) => {
       : r.repeats < ALARM_MAX && (!r.last_sent || now.getTime() - new Date(r.last_sent).getTime() > 50e3));
   const subsByUser: Record<string, { endpoint: string; sub: any }[]> = {};
   let sent = 0;
+  const errors: string[] = [];
 
   for (const r of todo) {
     if (!subsByUser[r.user_id]) {
       const { data } = await sb.from("push_subs").select("endpoint,sub").eq("user_id", r.user_id);
       subsByUser[r.user_id] = data ?? [];
+      if (!subsByUser[r.user_id].length) errors.push(`no phone with notifications on for "${r.title}"`);
     }
     const payload = JSON.stringify({ id: r.id, token: r.token, kind: r.kind, title: r.title, body: r.body, n: r.repeats + 1 });
     for (const s of subsByUser[r.user_id]) {
@@ -37,6 +39,9 @@ Deno.serve(async (req) => {
         sent++;
       } catch (e) {
         const code = (e as { statusCode?: number }).statusCode;
+        const msg = `push failed for "${r.title}": ${code ?? ""} ${(e as { body?: string }).body ?? String(e)}`;
+        console.error(msg);
+        errors.push(msg);
         if (code === 404 || code === 410) await sb.from("push_subs").delete().eq("endpoint", s.endpoint); // phone unsubscribed
       }
     }
@@ -45,5 +50,5 @@ Deno.serve(async (req) => {
       ...(r.kind === "notify" || r.repeats + 1 >= ALARM_MAX ? { acked_at: now.toISOString() } : {}),
     }).eq("id", r.id);
   }
-  return new Response(JSON.stringify({ due: todo.length, sent }), { headers: { "Content-Type": "application/json" } });
+  return new Response(JSON.stringify({ due: todo.length, sent, errors }), { headers: { "Content-Type": "application/json" } });
 });
