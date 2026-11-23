@@ -97,6 +97,10 @@ button{cursor:pointer}
 .ev.c-black:hover{filter:brightness(1.2)}
 .ev.c-black b{color:var(--surface)}
 
+/* Notification / alarm icons after an appointment title */
+.ri{margin-left:4px;font-size:.85em;white-space:nowrap}
+.ri span+span{margin-left:1px}
+.ev .ri,.ev .ri span,.col .ev .ri,.col .ev .ri span{display:inline;opacity:1}
 /* Week and day */
 .sticky{position:sticky;top:0;z-index:4;background:var(--surface)}
 .gridrow{display:grid;grid-template-columns:56px repeat(var(--n),minmax(0,1fr))}
@@ -375,7 +379,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=26; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=27; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -568,8 +572,13 @@ function eventsOn(d){
 function timeLabel(e){return e.allDay?"":e.start}
 /* Appointments with "werk" in the title (werk, werkoverleg, ...) are always shown in black */
 function colorOf(e){return /\bwerk/i.test(e.title)?"black":e.color}
+/* Small bell / alarm clock after the title when an appointment has a notification or alarm */
+function remIcons(e){
+  var n=e.notify!=null&&e.notify!=="",a=e.alarm!=null&&e.alarm!=="";
+  return n||a?'<span class="ri">'+(n?'<span title="Melding" aria-label="met melding">\ud83d\udd14</span>':"")+(a?'<span title="Alarm" aria-label="met alarm">\u23f0</span>':"")+"</span>":"";
+}
 function evChip(e){
-  return '<button class="ev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+"</button>";
+  return '<button class="ev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+remIcons(e)+"</button>";
 }
 function visibleDays(){
   if(ui.view==="day")return [ui.cursor];
@@ -642,7 +651,7 @@ function renderGrid(){
     html+='<div class="col'+(d===todayStr?" today":"")+'" data-col="'+d+'" style="height:'+(24*HOUR)+'px">';
     pack(items).forEach(function(it){
       var top=it.s/60*HOUR,hgt=Math.max((it.t-it.s)/60*HOUR-2,20),w=100/it.n;
-      html+='<button class="ev c-'+esc(colorOf(it.e))+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+"</button>";
+      html+='<button class="ev c-'+esc(colorOf(it.e))+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+remIcons(it.e)+"</button>";
     });
     if(d===todayStr)html+='<div class="now" style="top:'+(nowMin/60*HOUR)+'px"></div>';
     html+="</div>";
@@ -740,7 +749,7 @@ function renderDayInfo(){
   var html='<h3><span>'+esc(fLong(ui.cursor))+'</span><small>'+(evs.length?evs.length+(evs.length>1?" afspraken":" afspraak"):"")+'</small></h3>';
   if(!evs.length&&!dls.length)html+='<div class="empty">Geen afspraken op deze dag.</div>';
   evs.forEach(function(e){
-    html+='<button class="dayev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'"><span class="t">'+(e.allDay?"hele dag":e.start+"\u2013"+e.end)+'</span><span class="n">'+(e.repeat?"\u21bb ":"")+esc(e.title)+"</span></button>";
+    html+='<button class="dayev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'"><span class="t">'+(e.allDay?"hele dag":e.start+"\u2013"+e.end)+'</span><span class="n">'+(e.repeat?"\u21bb ":"")+esc(e.title)+remIcons(e)+"</span></button>";
   });
   dls.forEach(function(t){
     html+='<button class="dayev dl'+(t.done?" done":"")+'" data-dltodo="'+t.id+'"><span class="t">'+(t.done?"\u2713":"\u2691")+' deadline</span><span class="n">'+esc(t.text)+"</span></button>";
