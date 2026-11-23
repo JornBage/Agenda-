@@ -1,7 +1,8 @@
 # Mijn Agenda
 
 Persoonlijke agenda-app (afspraken, to-do's, dagdoelen, meldingen) in het Nederlands.
-Gehost via GitHub Pages: `index.html` stuurt door naar `Agenda.html`.
+Gehost via GitHub Pages op https://jornbage.github.io/agenda-Jorn/ (repository `JornBage/agenda-Jorn`, vroeger `claude-bestanden`).
+`index.html` stuurt door naar `Agenda.html`.
 
 ## Bestanden
 - `Agenda.html` — de hele app in één bestand (HTML + CSS + JavaScript, geen build-stap, geen frameworks).
@@ -20,6 +21,11 @@ Gehost via GitHub Pages: `index.html` stuurt door naar `Agenda.html`.
   aanpassen, verwijderen (ook voor weekdagen of een periode van een reeks), meldingen en alarmen.
 - Afspraken met "werk" in de titel worden zwart weergegeven.
 - Ongedaan maken: tot 50 stappen (Ctrl+Z).
+- Meldingen staan altijd aan: na inloggen meldt elk toestel zich automatisch aan (`ensurePush`); er is bewust geen
+  aan/uit-knop in de app. De browser vraagt één keer toestemming bij de eerste tik.
+- Afspraken met een melding tonen 🔔 achter de titel, met een alarm ⏰.
+- De app geeft meldingen en alarmen van de komende 30 dagen door aan Supabase (`buildReminders`), telkens bij het synchroniseren.
+- Supabase draait op het gratis plan: let op het verbruik (vooral "Log Query", dat stijgt door logs/grafieken in het dashboard te bekijken).
 
 ## Afspraken voor wijzigingen
 - Alle teksten in de app zijn in het Nederlands; code, variabelen en commentaar in het Engels.
