@@ -60,7 +60,24 @@ returns void language sql security definer set search_path = public as $$
 $$;
 grant execute on function public.ack_reminder(uuid, uuid) to anon, authenticated;
 
--- Every minute: ask the Edge Function to send what is due.
+-- True when the Edge Function has something to send right now (same rules as the function itself).
+create or replace function public.reminders_due_now()
+returns boolean language sql stable set search_path = public as $$
+  select exists (
+    select 1 from public.reminders r
+    where r.acked_at is null
+      and r.fire_at <= now()
+      and r.fire_at >= now() - interval '6 hours'
+      and (
+        (r.kind = 'notify' and r.sent_at is null)
+        or (r.kind = 'alarm' and r.repeats < 10
+            and (r.last_sent is null or r.last_sent < now() - interval '50 seconds'))
+      )
+  );
+$$;
+revoke all on function public.reminders_due_now() from public, anon, authenticated;
+
+-- Every minute: if something is due, ask the Edge Function to send it (no call, and no log lines, otherwise).
 create extension if not exists pg_cron with schema pg_catalog;
 create extension if not exists pg_net with schema extensions;
 select cron.unschedule('send-reminders') where exists (select 1 from cron.job where jobname = 'send-reminders');
@@ -69,4 +86,11 @@ select cron.schedule('send-reminders', '* * * * *', $$
     url := 'https://xvuqcmmxarvkpcetztno.supabase.co/functions/v1/send-reminders',
     headers := jsonb_build_object('Content-Type', 'application/json', 'x-cron-secret', '<CRON_SECRET>'),
     body := '{}'::jsonb)
+  where public.reminders_due_now()
 $$);
+
+-- pg_cron keeps a history row for every run; keep only the last day.
+select cron.unschedule('cleanup-cron-history')
+  where exists (select 1 from cron.job where jobname = 'cleanup-cron-history');
+select cron.schedule('cleanup-cron-history', '17 3 * * *',
+  $$delete from cron.job_run_details where end_time < now() - interval '1 day'$$);
