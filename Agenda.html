@@ -273,7 +273,6 @@ button{cursor:pointer}
     <button class="btn" id="undoBtn" disabled title="Laatste wijziging ongedaan maken (Ctrl+Z)">&#8630; Ongedaan maken</button>
     <button class="btn" id="toggleSide" aria-expanded="true" aria-controls="side">To-do's<span class="badge" id="badge">0</span></button>
     <span class="status" id="syncStatus" role="status" hidden></span>
-    <button class="btn" id="pushBtn" hidden title="Meldingen en alarmen op dit toestel">🔔</button>
     <button class="btn" id="syncBtn" hidden>Inloggen</button>
   </header>
 
@@ -376,7 +375,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=25; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=26; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -434,7 +433,7 @@ data.events.forEach(function(e){if(COLOR_MIGRATE[e.color])e.color=COLOR_MIGRATE[
 /* Cloud sync (Supabase). Leave URL or key empty to keep everything on this device only. */
 var SUPABASE_URL="https://xvuqcmmxarvkpcetztno.supabase.co";
 var SUPABASE_KEY="sb_publishable_OSzi_SMjJuKx9nDrA7UIfA_telqAWBY";
-var DIRTYKEY="agenda-dirty-v1", SYNCEDKEY="agenda-synced-user-v1";
+var DIRTYKEY="agenda-dirty-v1", SYNCEDKEY="agenda-synced-user-v1", PUSHKEY="agenda-push-user-v1";
 var sync={client:null,user:null,busy:false,timer:null,ver:0};
 function isDirty(){try{return localStorage.getItem(DIRTYKEY)==="1"}catch(e){return false}}
 function setDirty(v){try{v?localStorage.setItem(DIRTYKEY,"1"):localStorage.removeItem(DIRTYKEY)}catch(e){}}
@@ -518,7 +517,8 @@ function initCloud(){
     sync.client.auth.onAuthStateChange(function(ev,session){
       sync.user=session?session.user:null;updateSyncUi();
       /* do not call Supabase inside this callback: defer */
-      if(sync.user&&(ev==="SIGNED_IN"||ev==="INITIAL_SESSION"))setTimeout(pull,0);
+      if(sync.user&&(ev==="SIGNED_IN"||ev==="INITIAL_SESSION"))setTimeout(function(){pull();ensurePush(false)},0);
+      if(!sync.user)pushSaved=false;
     });
   };
   document.head.appendChild(s);
@@ -942,32 +942,40 @@ function syncReminders(){
 }
 function b64u(s){s=s.replace(/-/g,"+").replace(/_/g,"/");s+="===".slice((s.length+3)%4);var r=atob(s),a=new Uint8Array(r.length);for(var i=0;i<r.length;i++)a[i]=r.charCodeAt(i);return a}
 function pushMsg(t,err){var m=$("#quickMsg");m.classList.toggle("err",!!err);m.textContent=t}
-function updatePushBtn(){
-  var b=$("#pushBtn");if(!("PushManager" in window)||!("serviceWorker" in navigator)||!SUPABASE_URL)return;
-  b.hidden=false;
-  navigator.serviceWorker.ready.then(function(reg){return reg.pushManager.getSubscription()}).then(function(s){
-    var on=!!s&&Notification.permission==="granted";
-    b.textContent=on?"🔔 aan":"🔔";b.classList.toggle("primary",on);
-  }).catch(function(){});
-}
-$("#pushBtn").addEventListener("click",function(){
-  if(!sync.user){pushMsg("Log eerst in: meldingen en alarmen lopen via je account.",true);return}
+/* Notifications are always on: once logged in, every device subscribes automatically. Browsers only show the
+   permission question after a tap or key press, so when it has not been answered yet it is asked on the first one. */
+var pushAsked=false,pushSaved=false,pushWarned=false;
+function ensurePush(fromGesture){
+  if(!sync.user||!sync.client||!("PushManager" in window)||!("serviceWorker" in navigator)||!window.Notification)return;
+  var perm=Notification.permission;
+  if(perm==="denied"){
+    if(!pushWarned){pushWarned=true;pushMsg("Meldingen zijn geblokkeerd op dit toestel. Zet ze aan in de site-instellingen van je browser.",true)}
+    return;
+  }
+  if(perm==="default"){
+    if(!fromGesture){
+      if(pushAsked)return;pushAsked=true;
+      var once=function(){document.removeEventListener("click",once,true);document.removeEventListener("keydown",once,true);ensurePush(true)};
+      document.addEventListener("click",once,true);document.addEventListener("keydown",once,true);
+      return;
+    }
+    Notification.requestPermission().then(function(){if(Notification.permission!=="default")ensurePush(false)});
+    return;
+  }
+  if(pushSaved)return;pushSaved=true;
   var reg;
-  Notification.requestPermission().then(function(p){
-    if(p!=="granted")throw new Error("Meldingen zijn geblokkeerd. Zet ze aan in de site-instellingen van Chrome.");
-    return navigator.serviceWorker.ready;
-  }).then(function(r){reg=r;return r.pushManager.getSubscription()}).then(function(s){
+  navigator.serviceWorker.ready.then(function(r){reg=r;return r.pushManager.getSubscription()}).then(function(s){
     return s||reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64u(VAPID_PUBLIC)});
   }).then(function(s){
     var j=s.toJSON();
     return sync.client.from("push_subs").upsert({endpoint:j.endpoint,user_id:sync.user.id,sub:j});
   }).then(function(r){
-    if(r.error)throw new Error("Opslaan in Supabase mislukt. Is supabase-reminders.sql al uitgevoerd?");
-    remLast=null;syncReminders();updatePushBtn();
-    reg.showNotification("🔔 Meldingen staan aan",{body:"Op dit toestel krijg je nu meldingen en alarmen.",icon:"icon-192.png",tag:"agenda-test"});
-    pushMsg("Meldingen en alarmen staan aan op dit toestel. Je kreeg een testmelding.");
-  }).catch(function(e){pushMsg(e&&e.message?e.message:"Meldingen aanzetten is niet gelukt.",true)});
-});
+    if(r.error)throw new Error("Meldingen konden niet worden ingesteld in Supabase.");
+    remLast=null;syncReminders();
+    var first=true;try{first=localStorage.getItem(PUSHKEY)!==sync.user.id;localStorage.setItem(PUSHKEY,sync.user.id)}catch(e){}
+    if(first)reg.showNotification("🔔 Meldingen staan aan",{body:"Op dit toestel krijg je nu meldingen en alarmen.",icon:"icon-192.png",tag:"agenda-test"});
+  }).catch(function(e){pushSaved=false;pushMsg(e&&e.message?e.message:"Meldingen instellen is niet gelukt.",true)});
+}
 
 /* Quick add: type a sentence such as  voeg 'voetbaltraining' toe op 23 november van 19u30-21u
    Understands: quoted title, dates (23 november, 23/11, 2026-11-23, vandaag, morgen, overmorgen, weekdays),
@@ -1560,7 +1568,7 @@ setInterval(function(){
 },60000);
 
 renderAll();
-initCloud();updatePushBtn();
+initCloud();
 $("#ver").textContent="versie "+APP_VERSION;
 
 /* Auto-update: when served over http(s), look for a newer version of this page (bypassing the browser cache)
