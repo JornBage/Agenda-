@@ -9,6 +9,7 @@ Gehost via GitHub Pages: `index.html` stuurt door naar `Agenda.html`.
 - `sw.js` — service worker (offline gebruik); `manifest.json` + `icon-*.png` — installeerbare app (PWA).
 - `supabase-setup.sql` — tabel `agenda_data`: één rij per gebruiker met de hele agenda als JSON.
 - `supabase-reminders.sql` — tabellen `push_subs` en `reminders`, plus pg_cron-taak die elke minuut de Edge Function aanroept.
+- `supabase-reminders-update-1.sql` — update voor bestaande installaties: de Edge Function wordt alleen aangeroepen als er echt iets klaarstaat (`reminders_due_now()`), om logs en aanroepen te beperken.
 - `supabase/functions/send-reminders/index.ts` — Edge Function die meldingen en alarmen (web push) verstuurt.
 - `meldingen-installatie.md` — staat alleen lokaal en bevat geheime sleutels. Nooit committen (staat in `.git/info/exclude`).
 
