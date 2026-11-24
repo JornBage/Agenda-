@@ -1,6 +1,6 @@
 # Mijn Agenda
 
-Persoonlijke agenda-app (afspraken, to-do's, dagdoelen, meldingen) in het Nederlands.
+Persoonlijke agenda-app (afspraken, to-do's, reminders, dagdoelen, meldingen) in het Nederlands.
 Gehost via GitHub Pages op https://jornbage.github.io/agenda-Jorn/ (repository `JornBage/agenda-Jorn`, vroeger `claude-bestanden`).
 `index.html` stuurt door naar `Agenda.html`.
 
@@ -19,6 +19,9 @@ Gehost via GitHub Pages op https://jornbage.github.io/agenda-Jorn/ (repository `
 - De invoerbalk ("quick add") en spraakinvoer begrijpen Nederlandse zinnen, bv.
   `voeg 'voetbaltraining' toe op 23 november van 19u30-21u`, ook herhalingen (elke maandag, elke werkdag),
   aanpassen, verwijderen (ook voor weekdagen of een periode van een reeks), meldingen en alarmen.
+- Reminders (knop met post-it-icoon) zijn een tweede lijst met exact dezelfde mogelijkheden als de to-do's. Ze staan ook in
+  `data.todos`, met `list:"rem"` (to-do's hebben geen `list`). `ui.list` bepaalt welke lijst de zijbalk toont.
+  Snel invoeren: `reminder 'tandarts bellen' morgen` of `voeg 'x' toe aan mijn reminders`.
 - Afspraken met "werk" in de titel worden zwart weergegeven.
 - Ongedaan maken: tot 50 stappen (Ctrl+Z).
 - Meldingen staan altijd aan: na inloggen meldt elk toestel zich automatisch aan (`ensurePush`); er is bewust geen
