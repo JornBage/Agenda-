@@ -19,9 +19,10 @@ Gehost via GitHub Pages op https://jornbage.github.io/agenda-Jorn/ (repository `
 - De invoerbalk ("quick add") en spraakinvoer begrijpen Nederlandse zinnen, bv.
   `voeg 'voetbaltraining' toe op 23 november van 19u30-21u`, ook herhalingen (elke maandag, elke werkdag),
   aanpassen, verwijderen (ook voor weekdagen of een periode van een reeks), meldingen en alarmen.
-- Reminders (knop met post-it-icoon) zijn een tweede lijst met exact dezelfde mogelijkheden als de to-do's. Ze staan ook in
-  `data.todos`, met `list:"rem"` (to-do's hebben geen `list`). `ui.list` bepaalt welke lijst de zijbalk toont.
-  Snel invoeren: `reminder 'tandarts bellen' morgen` of `voeg 'x' toe aan mijn reminders`.
+- Reminders (knop met post-it-icoon) staan in `data.rems`: `{id,text,date,time,notify,alarm,color,done}`, één tijdstip
+  (geen duur); `notify`/`alarm` = minuten vooraf (zonder tijdstip t.o.v. 09:00). In de kalender: golvende lijn op het tijdstip
+  (zonder tijdstip: bij "hele dag"). De zijbalk toont to-do's of reminders (`ui.list`). Versie 28 bewaarde reminders als
+  to-do's met `list:"rem"`; `ensureRems` zet die om. Snel invoeren: `reminder 'vuilnis' morgen om 20u melding 10 min vooraf`.
 - Afspraken met "werk" in de titel worden zwart weergegeven.
 - Ongedaan maken: tot 50 stappen (Ctrl+Z).
 - Meldingen staan altijd aan: na inloggen meldt elk toestel zich automatisch aan (`ensurePush`); er is bewust geen
