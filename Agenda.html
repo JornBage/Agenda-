@@ -163,6 +163,27 @@ button{cursor:pointer}
 .empty{color:var(--muted);font-size:13px;padding:4px}
 .linkbtn{border:0;background:transparent;color:var(--muted);font-size:12px;text-decoration:underline;padding:0}
 
+/* Reminders: one moment in time, drawn as a wavy line in the calendar */
+.c-accent{--c:var(--accent)}
+.wv{display:block;background:var(--c);-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 4 Q3 0 6 4 T12 4' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center/12px 8px;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 4 Q3 0 6 4 T12 4' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center/12px 8px}
+.rw{position:absolute;left:2px;right:2px;height:30px;border:0;padding:0;background:transparent;z-index:2;cursor:pointer;text-align:left}
+.rw .wv{position:absolute;left:0;right:0;top:0;height:8px}
+.rw span{position:absolute;left:2px;top:8px;max-width:calc(100% - 4px);font-size:11px;font-weight:600;line-height:1.3;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:color-mix(in srgb,var(--c) 70%,var(--ink));background:color-mix(in srgb,var(--surface) 85%,transparent);padding:0 3px;border-radius:3px}
+.rw.done,.ev.rmc.done,.dayev.rmd.done{opacity:.45}
+.ev.rmc{background:transparent;border-left:0;padding:1px 2px 6px;line-height:1.25;text-decoration:underline wavy var(--c);text-decoration-thickness:1.5px;text-underline-offset:2px;text-decoration-skip-ink:none}
+.ev.rmc:hover{background:color-mix(in srgb,var(--c) 12%,var(--surface))}
+.ev.rmc.c-black{color:var(--ink)}
+.dayev.rmd{background:transparent;border-left:0;padding-left:4px}
+.dayev.rmd .n{text-decoration:underline wavy var(--c);text-decoration-thickness:1.5px;text-underline-offset:4px}
+.remform{display:flex;flex-direction:column;gap:8px;margin-top:12px;padding:10px;border:1px solid var(--line);border-radius:10px;background:color-mix(in srgb,var(--bg) 50%,var(--surface))}
+.remform .add{margin-top:0}
+.remform .row2{gap:8px}
+.remform .fld input,.remform .fld select{width:100%;min-width:0;box-sizing:border-box}
+.remform .swatches{gap:6px}
+.remform .sw{width:22px;height:22px}
+.remform.editing{border-color:var(--accent)}
+.todo.rmi .edit{border:0;background:transparent;color:var(--muted);font-size:14px;line-height:1;padding:0 2px;cursor:pointer}
+
 /* Dialog */
 .scrim{position:fixed;inset:0;background:rgba(10,14,20,.5);display:none;align-items:center;justify-content:center;padding:16px;z-index:20}
 .scrim.on{display:flex}
@@ -249,6 +270,7 @@ button{cursor:pointer}
 }
 @container (max-width:460px){
   .month .cell .ev{font-size:0;height:6px;min-height:6px;padding:0;border-left-width:0;border-radius:3px;background:var(--c)}
+  .month .cell .ev.rmc{height:8px;min-height:8px;border-radius:0;text-decoration:none;-webkit-mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 4 Q3 0 6 4 T12 4' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center/12px 8px;mask:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M0 4 Q3 0 6 4 T12 4' fill='none' stroke='black' stroke-width='2'/%3E%3C/svg%3E") repeat-x left center/12px 8px}
   .more{font-size:10px;padding:0}
   .col .ev{font-size:10px;padding:1px 3px}
 }
@@ -303,6 +325,23 @@ button{cursor:pointer}
           <button class="btn icon" id="closeSide" aria-label="Zijbalk sluiten">&#10005;</button>
         </div>
         <div class="side-scroll" id="todos"></div>
+        <div class="side-scroll" id="rems" hidden>
+          <form class="remform" id="remAdd" autocomplete="off">
+            <div class="add"><input type="text" id="rm-text" maxlength="140" placeholder="Nieuwe reminder" aria-label="Nieuwe reminder"><button class="btn primary" type="submit" id="rm-submit">Voeg toe</button></div>
+            <div class="row2">
+              <label class="fld">Datum<input type="date" id="rm-date"></label>
+              <label class="fld">Tijdstip<input type="time" id="rm-time"></label>
+            </div>
+            <div class="row2">
+              <label class="fld">🔔 Melding<select id="rm-notify"></select></label>
+              <label class="fld">⏰ Alarm<select id="rm-alarm"></select></label>
+            </div>
+            <div class="fld">Kleur<div class="swatches" role="radiogroup" aria-label="Kleur" id="rm-sw"></div></div>
+            <div class="hint" id="rm-hint">Zonder tijdstip komen melding en alarm om 09:00.</div>
+            <button type="button" class="linkbtn" id="rm-cancel" hidden>Annuleren</button>
+          </form>
+          <div class="sec"><h3><span>Mijn reminders</span><em id="rm-count"></em></h3><div id="rm-list"></div></div>
+        </div>
       </div>
     </aside>
   </div>
@@ -383,7 +422,7 @@ button{cursor:pointer}
 <script>
 (function(){
 "use strict";
-var APP_VERSION=28; /* raise on every release: open pages notice it and reload themselves */
+var APP_VERSION=29; /* raise on every release: open pages notice it and reload themselves */
 var HOUR=52, KEY="agenda-v1", UIKEY="agenda-ui-v1";
 var $=function(s){return document.querySelector(s)};
 var pad=function(n){return String(n).padStart(2,"0")};
@@ -434,6 +473,17 @@ if(!data||!Array.isArray(data.events)||!Array.isArray(data.todos)){
   data=seed();
   data.events.concat(data.todos).forEach(function(x){x.seed=true}); /* example items are never uploaded to the cloud */
 }
+/* Reminders live in data.rems. Version 28 stored them as to-dos with list:"rem": move those over. */
+function ensureRems(d){
+  if(!Array.isArray(d.rems))d.rems=[];
+  d.todos=d.todos.filter(function(t){
+    if(t.list!=="rem")return true;
+    var r={id:t.id,text:t.text,date:t.date||t.deadline||null,time:null,done:!!t.done};if(t.color)r.color=t.color;
+    d.rems.push(r);return false;
+  });
+  return d;
+}
+ensureRems(data);
 /* Migrate colour names stored by earlier (Dutch) versions */
 var COLOR_MIGRATE={blauw:"blue",groen:"green",oranje:"orange",rood:"red",paars:"purple"};
 data.events.forEach(function(e){if(COLOR_MIGRATE[e.color])e.color=COLOR_MIGRATE[e.color]});
@@ -490,7 +540,8 @@ function push(){
 }
 /* Add local items that the cloud copy does not have yet (used the first time a device logs in) */
 function union(remote,local){
-  ["events","todos"].forEach(function(k){
+  ensureRems(remote);ensureRems(local);
+  ["events","todos","rems"].forEach(function(k){
     var ids={};remote[k].forEach(function(x){ids[x.id]=1});
     local[k].forEach(function(x){if(!ids[x.id]&&!x.seed)remote[k].push(x)});
   });
@@ -506,7 +557,7 @@ function pull(){
     var valid=remote&&Array.isArray(remote.events)&&Array.isArray(remote.todos);
     var known=localStorage.getItem(SYNCEDKEY)===sync.user.id;
     if(!valid||(known&&isDirty()))return push();      /* nothing in the cloud yet, or local changes win */
-    data=known?remote:union(remote,data);              /* first login on this device merges both */
+    data=ensureRems(known?remote:union(remote,data));  /* first login on this device merges both */
     if(applyPresets())sync.ver++;
     persistLocal();resetUndo();renderAll();
     if(!known||isDirty())return push();
@@ -584,6 +635,13 @@ function remIcons(e){
 function evChip(e){
   return '<button class="ev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'" title="'+esc(e.title)+'">'+(e.allDay?"":"<b>"+e.start+"</b>")+(e.repeat?"\u21bb ":"")+esc(e.title)+remIcons(e)+"</button>";
 }
+function remsOn(d){
+  return data.rems.filter(function(r){return r.date===d}).sort(function(a,b){return (a.time||"")<(b.time||"")?-1:(a.time||"")>(b.time||"")?1:0});
+}
+function rmColor(r){return r.color||"accent"}
+function rmChip(r){
+  return '<button class="ev rmc c-'+rmColor(r)+(r.done?" done":"")+'" data-rm="'+r.id+'" title="Reminder: '+esc(r.text)+'">'+(r.time?"<b>"+r.time+"</b>":"")+esc(r.text)+remIcons(r)+"</button>";
+}
 function visibleDays(){
   if(ui.view==="day")return [ui.cursor];
   var m=mondayOf(ui.cursor),a=[];for(var i=0;i<7;i++)a.push(addDays(m,i));return a;
@@ -598,9 +656,9 @@ function renderHead(){
   $("#title").firstChild.nodeValue=t;
   $("#subtitle").textContent=s;
   ["month","week","day"].forEach(function(v){$("#tab-"+v).setAttribute("aria-selected",String(ui.view===v))});
-  var open=todosForDay(ui.cursor).filter(function(x){return !isDone(x,ui.cursor)});
-  $("#badge").textContent=open.filter(function(x){return listOf(x)==="todo"}).length;
-  $("#badgeRem").textContent=open.filter(function(x){return listOf(x)==="rem"}).length;
+  var open=todosForDay(ui.cursor).filter(function(x){return !isDone(x,ui.cursor)}).length;
+  $("#badge").textContent=open;
+  $("#badgeRem").textContent=remsOn(ui.cursor).filter(function(r){return !r.done}).length;
 }
 
 /* Month */
@@ -613,7 +671,7 @@ function renderMonth(){
   ["ma","di","wo","do","vr","za","zo"].forEach(function(n){html+='<div class="dow">'+n+"</div>"});
   var curMonth=ui.cursor.slice(0,7);
   for(var i=0;i<rows*7;i++){
-    var d=addDays(start,i),evs=eventsOn(d).map(evChip).concat(deadlinesOn(d).map(dlChip));
+    var d=addDays(start,i),evs=eventsOn(d).map(evChip).concat(remsOn(d).map(rmChip),deadlinesOn(d).map(dlChip));
     var cls="cell"+(d.slice(0,7)!==curMonth?" other":"")+(d===todayStr?" today":"")+(d===ui.cursor?" sel":"");
     html+='<div class="'+cls+'" data-day="'+d+'"><button class="dnum" data-goday="'+d+'" aria-label="'+fLong(d)+'">'+parse(d).getDate()+"</button>";
     evs.slice(0,3).forEach(function(c){html+=c});
@@ -643,7 +701,7 @@ function renderGrid(){
   });
   html+='</div><div class="gridrow alldayrow" style="--n:'+n+'"><div class="gl">hele dag</div>';
   days.forEach(function(d){
-    html+='<div class="ac" data-new-all="'+d+'">'+eventsOn(d).filter(function(e){return e.allDay}).map(evChip).join("")+deadlinesOn(d).map(dlChip).join("")+"</div>";
+    html+='<div class="ac" data-new-all="'+d+'">'+eventsOn(d).filter(function(e){return e.allDay}).map(evChip).join("")+remsOn(d).filter(function(r){return !r.time}).map(rmChip).join("")+deadlinesOn(d).map(dlChip).join("")+"</div>";
   });
   html+="</div></div>";
   html+='<div class="gridrow gridbody" style="--n:'+n+';--hour:'+HOUR+'px"><div class="gutter" style="height:'+(24*HOUR)+'px">';
@@ -657,6 +715,9 @@ function renderGrid(){
     pack(items).forEach(function(it){
       var top=it.s/60*HOUR,hgt=Math.max((it.t-it.s)/60*HOUR-2,20),w=100/it.n;
       html+='<button class="ev c-'+esc(colorOf(it.e))+'" data-ev="'+it.e.id+'" style="top:'+top+"px;height:"+hgt+"px;left:calc("+(it.col*w)+"% + 2px);width:calc("+w+'% - 4px)" title="'+esc(it.e.title)+'"><b>'+it.e.start+"</b>"+(it.e.repeat?"\u21bb ":"")+esc(it.e.title)+remIcons(it.e)+"</button>";
+    });
+    remsOn(d).filter(function(r){return r.time}).forEach(function(r){
+      html+='<button class="rw c-'+rmColor(r)+(r.done?" done":"")+'" data-rm="'+r.id+'" style="top:'+(toMin(r.time)/60*HOUR-4)+'px" title="Reminder '+r.time+': '+esc(r.text)+'"><i class="wv"></i><span>'+r.time+" "+esc(r.text)+remIcons(r)+"</span></button>";
     });
     if(d===todayStr)html+='<div class="now" style="top:'+(nowMin/60*HOUR)+'px"></div>';
     html+="</div>";
@@ -683,14 +744,6 @@ function onSchedule(t,d){
   return t.repeat.days.indexOf(parse(d).getDay())>=0;
 }
 function todosForDay(d){return data.todos.filter(function(t){return todoOccursOn(t,d)})}
-/* Two lists share the same features: to-dos (list "todo", the default) and reminders (list "rem") */
-function listOf(t){return t.list==="rem"?"rem":"todo"}
-function inList(t){return listOf(t)===ui.list}
-var POSTIT='<svg class="postit" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v12l-6 6H3z" fill="#ffd84d" stroke="#d9a900" stroke-width="1.5" stroke-linejoin="round"/><path d="M15 21v-6h6" fill="#f2c200" stroke="#d9a900" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8h10M7 12h6" stroke="#b38600" stroke-width="1.5" stroke-linecap="round"/></svg>';
-var LIST_TXT={
-  todo:{title:"To-do's",day:"Taak voor deze dag",gen:"Algemene taak",genEmpty:"Nog geen algemene taken.",clear:"Wis alle afgevinkte taken",aside:"To-do-lijst"},
-  rem:{title:POSTIT+"Reminders",day:"Reminder voor deze dag",gen:"Algemene reminder",genEmpty:"Nog geen algemene reminders.",clear:"Wis alle afgevinkte reminders",aside:"Reminders"}
-};
 function isDone(t,d){return t.repeat?(t.doneDates||[]).indexOf(d)>=0:!!t.done}
 function setDone(t,d,v){
   if(t.repeat){t.doneDates=(t.doneDates||[]).filter(function(x){return x!==d});if(v)t.doneDates.push(d)}
@@ -722,29 +775,31 @@ function todoItem(x){
 }
 var availOpen=false;
 function renderTodos(){
-  var T=LIST_TXT[ui.list];
-  var all=todosForDay(ui.cursor).filter(inList),day=all.filter(function(x){return !x.repeat});
+  $("#todos").hidden=ui.list==="rem";$("#rems").hidden=ui.list!=="rem";
+  $("#sideTitle").innerHTML=ui.list==="rem"?POSTIT+"Reminders":"To-do's";
+  $("#side").setAttribute("aria-label",ui.list==="rem"?"Reminders":"To-do-lijst");
+  if(ui.list==="rem"){renderRems();return}
+  var all=todosForDay(ui.cursor),day=all.filter(function(x){return !x.repeat});
   var goals=all.filter(function(x){return x.repeat}).sort(function(a,b){return isFocus(b,ui.cursor)-isFocus(a,ui.cursor)});
   var gh=goals.filter(function(x){return isDone(x,ui.cursor)}).length,gf=goals.filter(function(x){return isFocus(x,ui.cursor)}).length;
-  var gen=data.todos.filter(function(x){return inList(x)&&!x.date&&!x.repeat}).sort(function(a,b){
+  var gen=data.todos.filter(function(x){return !x.date&&!x.repeat}).sort(function(a,b){
     return (a.deadline||"9999")<(b.deadline||"9999")?-1:(a.deadline||"9999")>(b.deadline||"9999")?1:0});
   var dd=day.filter(function(x){return isDone(x,ui.cursor)}).length, gd=gen.filter(function(x){return x.done}).length;
   var label=ui.cursor===todayStr?"Vandaag":fSide(ui.cursor);
   var html='<div class="sec"><h3><span>'+esc(label)+"</span><em>"+dd+"/"+day.length+' klaar</em></h3>'+
     (day.length?day.map(todoItem).join(""):'<div class="empty">Niets gepland voor deze dag.</div>')+
-    '<form class="add" data-add="day"><input type="text" id="add-day" placeholder="'+T.day+'" maxlength="140" aria-label="'+T.day+'" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
+    '<form class="add" data-add="day"><input type="text" id="add-day" placeholder="Taak voor deze dag" maxlength="140" aria-label="Taak voor deze dag" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
   html+='<div class="sec"><h3><span>Daily goals</span><em>'+gh+"/"+goals.length+" gehaald"+(gf?" \u00b7 \u2605 "+gf:"")+'</em></h3>'+
     (goals.length?goals.map(todoItem).join(""):'<div class="empty">Geen doelen voor deze dag. Tik \u2606 om te kiezen waar je vandaag aan werkt.</div>')+
     '<form class="add" data-add="goal"><input type="text" id="add-goal" placeholder="Nieuw doel" maxlength="140" aria-label="Nieuw doel" autocomplete="off"><select id="goal-rep" aria-label="Herhaling"><option value="1">Dagelijks</option><option value="2">Om de 2 dagen</option><option value="7">Wekelijks</option><option value="0">Zelf kiezen</option></select><button class="btn" type="submit">Voeg toe</button></form></div>';
-  var avail=data.todos.filter(function(x){return inList(x)&&x.repeat&&(x.repeat.manual?!todoOccursOn(x,ui.cursor)&&!(x.repeat.until&&ui.cursor>x.repeat.until):(x.skipDates||[]).indexOf(ui.cursor)>=0&&onSchedule(x,ui.cursor))});
+  var avail=data.todos.filter(function(x){return x.repeat&&(x.repeat.manual?!todoOccursOn(x,ui.cursor)&&!(x.repeat.until&&ui.cursor>x.repeat.until):(x.skipDates||[]).indexOf(ui.cursor)>=0&&onSchedule(x,ui.cursor))});
   if(avail.length)html+='<details class="sec hidebox" id="availBox"'+(availOpen?" open":"")+'><summary><span>Niet vandaag</span><em>'+avail.length+' \u00b7 tik + om terug te zetten</em></summary>'+avail.map(function(x){
     return '<div class="todo avail"><button class="pick" data-plan="'+x.id+'" aria-label="Kies voor deze dag: '+esc(x.text)+'">+</button><label>'+esc(x.text)+(x.repeat.manual?'':'<span class="dlb">overgeslagen</span>')+'</label><button class="x" data-deltodo="'+x.id+'" aria-label="Verwijder '+esc(x.text)+'">&times;</button></div>'}).join("")+'</details>';
   html+='<div class="sec"><h3><span>Algemeen</span><em>'+gd+"/"+gen.length+' klaar</em></h3>'+
-    (gen.length?gen.map(todoItem).join(""):'<div class="empty">'+T.genEmpty+'</div>')+
-    '<form class="add" data-add="gen"><input type="text" id="add-gen" placeholder="'+T.gen+'" maxlength="140" aria-label="'+T.gen+'" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
-  var any=data.todos.some(function(x){return inList(x)&&!x.repeat&&x.done});
-  if(any)html+='<div class="sec"><button class="linkbtn" data-clear>'+T.clear+'</button></div>';
-  $("#sideTitle").innerHTML=T.title;$("#side").setAttribute("aria-label",T.aside);
+    (gen.length?gen.map(todoItem).join(""):'<div class="empty">Nog geen algemene taken.</div>')+
+    '<form class="add" data-add="gen"><input type="text" id="add-gen" placeholder="Algemene taak" maxlength="140" aria-label="Algemene taak" autocomplete="off"><button class="btn" type="submit">Voeg toe</button></form></div>';
+  var any=data.todos.some(function(x){return !x.repeat&&x.done});
+  if(any)html+='<div class="sec"><button class="linkbtn" data-clear>Wis alle afgevinkte taken</button></div>';
   var keep=document.activeElement&&document.activeElement.id,val=keep&&document.activeElement.value;
   $("#todos").innerHTML=html;
   if(keep&&/^add-/.test(keep)){var el=document.getElementById(keep);if(el){el.value=val;el.focus()}}
@@ -763,7 +818,11 @@ function renderDayInfo(){
   if(ui.view==="day"){el.classList.remove("on");el.innerHTML="";return}
   var evs=eventsOn(ui.cursor),dls=deadlinesOn(ui.cursor);
   var html='<h3><span>'+esc(fLong(ui.cursor))+'</span><small>'+(evs.length?evs.length+(evs.length>1?" afspraken":" afspraak"):"")+'</small></h3>';
-  if(!evs.length&&!dls.length)html+='<div class="empty">Geen afspraken op deze dag.</div>';
+  var rms=remsOn(ui.cursor);
+  if(!evs.length&&!dls.length&&!rms.length)html+='<div class="empty">Geen afspraken op deze dag.</div>';
+  rms.forEach(function(r){
+    html+='<button class="dayev rmd c-'+rmColor(r)+(r.done?" done":"")+'" data-rm="'+r.id+'"><span class="t">'+(r.time||"reminder")+'</span><span class="n">'+esc(r.text)+remIcons(r)+"</span></button>";
+  });
   evs.forEach(function(e){
     html+='<button class="dayev c-'+esc(colorOf(e))+'" data-ev="'+e.id+'"><span class="t">'+(e.allDay?"hele dag":e.start+"\u2013"+e.end)+'</span><span class="n">'+(e.repeat?"\u21bb ":"")+esc(e.title)+remIcons(e)+"</span></button>";
   });
@@ -843,6 +902,7 @@ document.addEventListener("keydown",function(e){if(e.key==="Escape"&&$("#scrim")
 /* Calendar interactions */
 $("#scroller").addEventListener("click",function(e){
   var t=e.target;
+  var rm=t.closest("[data-rm]");if(rm){openRemItem(rm.dataset.rm);return}
   var dl=t.closest("[data-dltodo]");if(dl){toggleDeadline(dl.dataset.dltodo);return}
   var ev=t.closest("[data-ev]");
   if(ev){var f=data.events.find(function(x){return x.id===ev.dataset.ev});if(f)openDlg(f);return}
@@ -865,6 +925,7 @@ $("#scroller").addEventListener("dblclick",function(e){
 });
 
 $("#dayinfo").addEventListener("click",function(e){
+  var rm=e.target.closest("[data-rm]");if(rm){openRemItem(rm.dataset.rm);return}
   var dl=e.target.closest("[data-dltodo]");if(dl){toggleDeadline(dl.dataset.dltodo);return}
   var ev=e.target.closest("[data-ev]");
   if(ev){var f=data.events.find(function(x){return x.id===ev.dataset.ev});if(f)openDlg(f);return}
@@ -890,7 +951,7 @@ $("#todos").addEventListener("click",function(e){
   if(fo){var ft=data.todos.find(function(t){return t.id===fo.dataset.focus});if(ft){toggleFocus(ft,ui.cursor);save();renderTodos()}return}
   var d=e.target.closest("[data-deltodo]");
   if(d){data.todos=data.todos.filter(function(t){return t.id!==d.dataset.deltodo});save();renderAll();return}
-  if(e.target.closest("[data-clear]")){data.todos=data.todos.filter(function(t){return !inList(t)||t.repeat||!t.done});save();renderAll()}
+  if(e.target.closest("[data-clear]")){data.todos=data.todos.filter(function(t){return t.repeat||!t.done});save();renderAll()}
 });
 $("#todos").addEventListener("submit",function(e){
   e.preventDefault();
@@ -898,12 +959,76 @@ $("#todos").addEventListener("submit",function(e){
   var inp=f.querySelector("input"),txt=inp.value.trim();if(!txt)return;
   if(f.dataset.add==="goal"){
     var n=+f.querySelector("select").value;
-    data.todos.push({id:uid(),text:txt,done:false,date:ui.cursor,doneDates:[],list:ui.list==="rem"?"rem":undefined,
+    data.todos.push({id:uid(),text:txt,done:false,date:ui.cursor,doneDates:[],
       planDates:n===0?[ui.cursor]:undefined,
       repeat:n===0?{manual:true,days:[],until:null}:n===7?{days:[parse(ui.cursor).getDay()],until:null}:{days:[0,1,2,3,4,5,6],until:null,every:n>1?n:undefined}});
-  }else data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null,list:ui.list==="rem"?"rem":undefined});
+  }else data.todos.push({id:uid(),text:txt,done:false,date:f.dataset.add==="day"?ui.cursor:null});
   inp.value="";save();renderHead();renderTodos();
   var again=document.getElementById("add-"+f.dataset.add);if(again)again.focus();
+});
+
+/* Reminders sidebar: one form to add or edit (text, date, time, notification, alarm, colour) and one list */
+var POSTIT='<svg class="postit" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3h18v12l-6 6H3z" fill="#ffd84d" stroke="#d9a900" stroke-width="1.5" stroke-linejoin="round"/><path d="M15 21v-6h6" fill="#f2c200" stroke="#d9a900" stroke-width="1.5" stroke-linejoin="round"/><path d="M7 8h10M7 12h6" stroke="#b38600" stroke-width="1.5" stroke-linecap="round"/></svg>';
+var REM_OPTS=[["","Geen"],["0","Op het tijdstip"],["5","5 min vooraf"],["10","10 min vooraf"],["15","15 min vooraf"],["30","30 min vooraf"],["60","1 uur vooraf"],["120","2 uur vooraf"],["1440","1 dag vooraf"]];
+$("#rm-notify").innerHTML=$("#rm-alarm").innerHTML=REM_OPTS.map(function(o){return '<option value="'+o[0]+'">'+o[1]+"</option>"}).join("");
+var rmEditing=null,rmColorSel="";
+function setRmColor(c){rmColorSel=c;document.querySelectorAll("#rm-sw .sw").forEach(function(b){b.setAttribute("aria-checked",String(b.dataset.c===c))})}
+function resetRemForm(){
+  rmEditing=null;$("#rm-text").value="";$("#rm-date").value=ui.cursor;$("#rm-time").value="";
+  $("#rm-notify").value="";$("#rm-alarm").value="";setRmColor("");
+  $("#rm-submit").textContent="Voeg toe";$("#rm-cancel").hidden=true;$("#remAdd").classList.remove("editing");
+}
+function rmWhen(r){
+  if(!r.date)return r.time||"";
+  var lbl=r.date===todayStr?"vandaag":r.date===addDays(todayStr,1)?"morgen":fDm(r.date);
+  return lbl+(r.time?" · "+r.time:"");
+}
+function rmItem(r){
+  var cls=!r.done&&r.date&&(r.date<todayStr||(r.date===todayStr&&r.time&&r.time<pad(new Date().getHours())+":"+pad(new Date().getMinutes())))?" over":(!r.done&&r.date===todayStr?" today":"");
+  var w=rmWhen(r);
+  return '<div class="todo rmi'+(r.done?" done":"")+(r.color?" hasc c-"+r.color:"")+'"><input type="checkbox" id="rm-'+r.id+'" data-rmdone="'+r.id+'"'+(r.done?" checked":"")+'><label for="rm-'+r.id+'">'+esc(r.text)+(w?'<span class="dlb'+cls+'">'+esc(w)+"</span>":"")+remIcons(r)+'</label><button class="edit" data-rmedit="'+r.id+'" title="Aanpassen" aria-label="Pas '+esc(r.text)+' aan">✎</button><button class="x" data-rmdel="'+r.id+'" aria-label="Verwijder '+esc(r.text)+'">&times;</button></div>';
+}
+function renderRems(){
+  if(!$("#rm-sw").firstChild)$("#rm-sw").innerHTML=swatchHtml(true);
+  if(!rmEditing&&!$("#rm-text").value)$("#rm-date").value=ui.cursor;
+  var key=function(r){return (r.done?"1":"0")+(r.date||"9999-99-99")+(r.time||"")};
+  var list=data.rems.slice().sort(function(a,b){return key(a)<key(b)?-1:key(a)>key(b)?1:0});
+  var open=list.filter(function(r){return !r.done}).length;
+  $("#rm-count").textContent=open+" open";
+  $("#rm-list").innerHTML=(list.length?list.map(rmItem).join(""):'<div class="empty">Nog geen reminders.</div>')+
+    (list.some(function(r){return r.done})?'<div class="sec"><button class="linkbtn" data-rmclear>Wis alle afgevinkte reminders</button></div>':"");
+}
+function editRem(id){
+  var r=data.rems.find(function(x){return x.id===id});if(!r)return;
+  rmEditing=r;$("#rm-text").value=r.text;$("#rm-date").value=r.date||"";$("#rm-time").value=r.time||"";
+  $("#rm-notify").value=r.notify!=null?String(r.notify):"";$("#rm-alarm").value=r.alarm!=null?String(r.alarm):"";setRmColor(r.color||"");
+  $("#rm-submit").textContent="Opslaan";$("#rm-cancel").hidden=false;$("#remAdd").classList.add("editing");
+  $("#rems").scrollTop=0;$("#rm-text").focus();
+}
+/* tap a reminder in the calendar: open the Reminders sidebar and edit it there */
+function openRemItem(id){ui.side=true;ui.list="rem";saveUi();applySide();renderTodos();editRem(id)}
+$("#rm-sw").addEventListener("click",function(e){var b=e.target.closest(".sw");if(b)setRmColor(b.dataset.c)});
+$("#rm-cancel").addEventListener("click",function(){resetRemForm();renderRems()});
+$("#remAdd").addEventListener("submit",function(e){
+  e.preventDefault();
+  var txt=$("#rm-text").value.trim();if(!txt){$("#rm-text").focus();return}
+  var r=rmEditing||{id:uid(),done:false};
+  r.text=txt;r.date=$("#rm-date").value||null;r.time=$("#rm-time").value||null;
+  ["notify","alarm"].forEach(function(k){var v=$("#rm-"+k).value;if(v!=="")r[k]=+v;else delete r[k]});
+  if(rmColorSel)r.color=rmColorSel;else delete r.color;
+  if(!rmEditing)data.rems.push(r);
+  if(r.date)ui.cursor=r.date;
+  resetRemForm();save();renderAll();$("#rm-text").focus();
+});
+$("#rm-list").addEventListener("change",function(e){
+  var id=e.target.dataset.rmdone;if(!id)return;
+  var r=data.rems.find(function(x){return x.id===id});if(r){r.done=e.target.checked;save();renderAll()}
+});
+$("#rm-list").addEventListener("click",function(e){
+  var ed=e.target.closest("[data-rmedit]");if(ed){editRem(ed.dataset.rmedit);return}
+  var d=e.target.closest("[data-rmdel]");
+  if(d){if(rmEditing&&rmEditing.id===d.dataset.rmdel)resetRemForm();data.rems=data.rems.filter(function(r){return r.id!==d.dataset.rmdel});save();renderAll();return}
+  if(e.target.closest("[data-rmclear]")){data.rems=data.rems.filter(function(r){return !r.done});save();renderAll()}
 });
 
 /* Notifications and alarms: the app lists every reminder of the next 30 days in Supabase;
@@ -946,8 +1071,12 @@ function buildReminders(){
     })});
     todosForDay(d).filter(function(t){return !isDone(t,d)}).concat(deadlinesOn(d).filter(function(t){return !t.done}))
       .forEach(function(t){["notify","alarm"].forEach(function(k){
-        if(t[k])add(t.id,d,k,new Date(d+"T"+t[k]),t.text,t.deadline===d?"Deadline vandaag":(t.repeat?"Daily goal":listOf(t)==="rem"?"Reminder voor vandaag":"To-do voor vandaag"));
+        if(t[k])add(t.id,d,k,new Date(d+"T"+t[k]),t.text,t.deadline===d?"Deadline vandaag":(t.repeat?"Daily goal":"To-do voor vandaag"));
       })});
+    remsOn(d).filter(function(r){return !r.done}).forEach(function(r){["notify","alarm"].forEach(function(k){
+      if(r[k]==null||r[k]==="")return;
+      add(r.id,d,k,new Date(new Date(d+"T"+(r.time||"09:00")).getTime()-r[k]*60000),r.text,"Reminder · "+fLong(d)+(r.time?", "+r.time:""));
+    })});
   }
   return out;
 }
@@ -1007,7 +1136,7 @@ function ensurePush(fromGesture){
    times (19u30, 19:30, 19u-22u, van 19u30 tot 21u), repeats ("elke maandag, dinsdag en vrijdag", "elke werkdag",
    "dagelijks", optionally "tot 20 december"), colours ("in het rood", "kleur groen"). Prefix "todo" or "taak" adds a to-do instead
    ("todo 'rapport' deadline 30 november", "todo 'medicatie' elke dag", "voeg 'bellen' toe aan mijn to-do's voor vrijdag").
-   Prefix "reminder" (or "... toe aan mijn reminders") does the same in the Reminders list ("reminder 'tandarts bellen' morgen").
+   Prefix "reminder" (or "... toe aan mijn reminders") adds a reminder: one moment, e.g. "reminder 'vuilnis' morgen om 20u melding 10 min vooraf".
    "aanpassen 'werk' van 9u-17u" / "wijzig ..." changes an existing appointment found by its title:
    only the things you mention are changed (time, repeat days, end date, start date, colour, "naar 'nieuwe titel'").
    Weekdays plus another change ("aanpassen 'werk' elke ma, di, do van 9u-17u") only change those weekdays; the rest of the series stays as it was.
@@ -1089,9 +1218,9 @@ function parseQuick(input){
     m=s.match(/^\s*(?:(?:voeg|zet|maak)\s+)?(?:(?:een|de|mijn)\s+)?(?:to-?\s?do|taak)\b[:\s]*/i);
     if(m){r.kind="todo";s=" "+s.slice(m[0].length)}
     else if(take(/\b(?:aan|op|in)\s+(?:mijn\s+|de\s+)?(?:to-?\s?do(?:'?s)?(?:-?lijst)?|takenlijst|taken)\b/i))r.kind="todo";
-    /* "reminder ...", "voeg ... toe aan mijn reminders": same as a to-do, but in the Reminders list */
-    else if((m=s.match(/^\s*(?:(?:voeg|zet|maak)\s+)?(?:(?:een|de|mijn)\s+)?(?:reminder|post-?it)\b[:\s]*/i))){r.kind="todo";r.list="rem";s=" "+s.slice(m[0].length)}
-    else if(take(/\b(?:aan|op|in|bij)\s+(?:mijn\s+|de\s+)?(?:reminders?|post-?its?)\b/i)){r.kind="todo";r.list="rem"}
+    /* "reminder ...", "voeg ... toe aan mijn reminders": one moment (date + optional time) in the Reminders list */
+    else if((m=s.match(/^\s*(?:(?:voeg|zet|maak)\s+)?(?:(?:een|de|mijn)\s+)?(?:reminder|post-?it)\b[:\s]*/i))){r.kind="rem";s=" "+s.slice(m[0].length)}
+    else if(take(/\b(?:aan|op|in|bij)\s+(?:mijn\s+|de\s+)?(?:reminders?|post-?its?)\b/i))r.kind="rem";
   }
   if(r.kind==="modify"){
     m=take(/\bnaar\s+["“„«'‘](.+?)["”»'’]/);
@@ -1194,7 +1323,8 @@ function parseQuick(input){
   if(r.kind==="delete"&&d&&!sel){sel={from:d,to:d};d=null}   /* bare date when deleting = that day */
   r.sel=sel;
   if(days&&r.kind==="todo"&&r.deadline)return {error:"Een terugkerende to-do kan geen deadline hebben."};
-  r.date=d||((r.kind==="event"||(r.kind==="todo"&&days))?todayStr:null);
+  if(days&&r.kind==="rem")return {error:"Een reminder kan niet herhalen. Maak er een to-do of afspraak van."};
+  r.date=d||((r.kind==="event"||r.kind==="rem"||(r.kind==="todo"&&days))?todayStr:null);
   if(days){
     if(every&&r.kind!=="todo")return {error:(every<0?"'Zelf kiezen'":"'Om de 2 dagen'")+" kan alleen bij to-do's of doelen."};
     if(weekly)days=[parse(r.date).getDay()];
@@ -1213,7 +1343,7 @@ function parseQuick(input){
       if(v.at&&r.kind==="modify"){(r.remAt=r.remAt||{})[k]=v.at;r[k]=v.at}   /* resolved per item in modifyEvents */
       else if(v.at){
         var base=r.hasTime?toMin(r.start):540;
-        if(toMin(v.at)>base)return {error:"Het tijdstip van "+word+" ligt na het begin van de afspraak."};
+        if(toMin(v.at)>base)return {error:"Het tijdstip van "+word+" ligt na het begin van de "+(r.kind==="rem"?"reminder.":"afspraak.")};
         r[k]=base-toMin(v.at);
       }else r[k]=v.bare?0:v.min;
     }
@@ -1450,17 +1580,20 @@ $("#quickForm").addEventListener("submit",function(e){
     msg.textContent=(del.label
       ? "Verwijderd: '"+r.title+"' "+del.label+(del.n>1?" ("+del.n+" afspraken)":"")
       : "Verwijderd: alle afspraken met de titel '"+r.title+"'"+(del.n>1?" ("+del.n+")":""))+". Klik op Ongedaan maken om dit terug te zetten.";
+  }else if(r.kind==="rem"){
+    var rmn={id:uid(),text:r.title,date:r.date,time:r.hasTime?r.start:null,done:false};
+    if(r.notify!=null)rmn.notify=r.notify;if(r.alarm!=null)rmn.alarm=r.alarm;if(r.color)rmn.color=r.color;
+    data.rems.push(rmn);ui.cursor=r.date;ui.list="rem";saveUi();
+    msg.textContent="Reminder toegevoegd: "+r.title+" ("+fLong(r.date)+(rmn.time?", "+rmn.time:"")+")"+(r.color?", "+COLOR_NL[r.color]:"");
   }else if(r.kind==="todo"){
     var td={id:uid(),text:r.title,done:false,date:r.date};
-    if(r.list==="rem")td.list="rem";
-    ui.list=r.list==="rem"?"rem":"todo";saveUi();
     if(r.deadline)td.deadline=r.deadline;
     if(r.notify)td.notify=r.notify;if(r.alarm)td.alarm=r.alarm;
     if(r.color)td.color=r.color;
     if(r.repeat){td.repeat=r.repeat;td.doneDates=[];if(r.repeat.manual)td.planDates=[r.date]}
     data.todos.push(td);
     if(r.date)ui.cursor=r.date;else if(r.deadline)ui.cursor=r.deadline;
-    msg.textContent=(r.list==="rem"?"Reminder":"To-do")+" toegevoegd: "+r.title+(r.repeat
+    msg.textContent="To-do toegevoegd: "+r.title+(r.repeat
       ? " \u2014 "+repeatLabel(r.repeat)+(r.repeat.until?" tot "+fLong(r.repeat.until):"")
       : (r.date?" ("+fLong(r.date)+")":" (algemeen)"))+(r.deadline?", deadline "+fLong(r.deadline):"")+(r.color?", "+COLOR_NL[r.color]:"");
   }else{
@@ -1592,7 +1725,6 @@ function showList(l){
   if(ui.side&&ui.list===l)ui.side=false;else{ui.side=true;ui.list=l}
   saveUi();renderTodos();applySide();
 }
-function toggleSide(){showList(ui.list)}
 $("#toggleSide").addEventListener("click",function(){showList("todo")});
 $("#toggleRem").addEventListener("click",function(){showList("rem")});
 $("#closeSide").addEventListener("click",function(){ui.side=false;saveUi();applySide();$(ui.list==="rem"?"#toggleRem":"#toggleSide").focus()});
